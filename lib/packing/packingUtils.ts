@@ -7,7 +7,6 @@ const { BP3D } = require('binpackingjs') as any
 const { Item, Bin, Packer } = BP3D
 
 // binpackingjs scales every dimension by 1e5 internally.
-// All position/dimension values coming back must be divided by 1e5 to restore cm units.
 const SCALE = 1e5
 
 export function toPackingItem(box: CargoBox) {
@@ -18,7 +17,6 @@ export function toPackingBin(size: ContainerSize) {
   return new Bin('container', size.w, size.h, size.d, size.maxWeight ?? 99999)
 }
 
-// Convert packed item's internal (scaled) position back to real-world cm, center of box
 function itemCenter(item: { position: number[]; width: number; height: number; depth: number }) {
   return {
     x: (item.position[0] + item.width / 2) / SCALE,
@@ -27,29 +25,72 @@ function itemCenter(item: { position: number[]; width: number; height: number; d
   }
 }
 
+/** Check if two box footprints overlap in X,Z only (ignores Y) */
+export function footprintOverlaps(
+  ax: number, aw: number, az: number, ad: number,
+  bx: number, bw: number, bz: number, bd: number
+): boolean {
+  return (
+    ax - aw / 2 < bx + bw / 2 &&
+    ax + aw / 2 > bx - bw / 2 &&
+    az - ad / 2 < bz + bd / 2 &&
+    az + ad / 2 > bz - bd / 2
+  )
+}
+
+/**
+ * Find the highest support surface Y at a given (x, z) position.
+ * Returns floor (0) if no box supports at that footprint.
+ */
+export function getSupportY(
+  x: number,
+  z: number,
+  newBox: CargoBox,
+  placedBoxes: CargoBox[],
+  containerSize: ContainerSize
+): number {
+  let supportTop = 0
+  for (const other of placedBoxes) {
+    if (other.id === newBox.id) continue
+    if (
+      footprintOverlaps(
+        x, newBox.size.w, z, newBox.size.d,
+        other.position.x, other.size.w, other.position.z, other.size.d
+      )
+    ) {
+      const top = other.position.y + other.size.h / 2
+      if (top > supportTop) supportTop = top
+    }
+  }
+  const y = supportTop + newBox.size.h / 2
+  return Math.min(y, containerSize.h - newBox.size.h / 2)
+}
+
+/**
+ * Find the first free position for a new box by scanning the container in a grid.
+ * Respects actual current positions of placed boxes (unlike binpackingjs which repacks from scratch).
+ */
 export function suggestPosition(
   newBox: CargoBox,
   placedBoxes: CargoBox[],
   containerSize: ContainerSize
 ): THREE.Vector3 | null {
-  try {
-    const packer = new Packer()
-    packer.addBin(toPackingBin(containerSize))
-    placedBoxes.forEach((b) => packer.addItem(toPackingItem(b)))
-    packer.addItem(toPackingItem(newBox))
-    packer.pack()
+  // Scan step = half of the box dimension for reasonable coverage
+  const stepX = Math.max(newBox.size.w / 2, 1)
+  const stepZ = Math.max(newBox.size.d / 2, 1)
 
-    const bin = packer.bins[0]
-    if (!bin) return null
+  for (let z = newBox.size.d / 2; z <= containerSize.d - newBox.size.d / 2; z += stepZ) {
+    for (let x = newBox.size.w / 2; x <= containerSize.w - newBox.size.w / 2; x += stepX) {
+      const y = getSupportY(x, z, newBox, placedBoxes, containerSize)
+      // Skip if box would exceed container height
+      if (y + newBox.size.h / 2 > containerSize.h) continue
 
-    const packed = bin.items.find((i: { name: string }) => i.name === newBox.id)
-    if (!packed) return null
-
-    const c = itemCenter(packed)
-    return new THREE.Vector3(c.x, c.y, c.z)
-  } catch {
-    return null
+      const candidate = new THREE.Vector3(x, y, z)
+      const result = validatePlacement(newBox, candidate, placedBoxes, containerSize)
+      if (result.valid) return candidate
+    }
   }
+  return null
 }
 
 export function validatePlacement(
@@ -70,19 +111,20 @@ export function validatePlacement(
     return { valid: false, reason: 'กล่องเกินขอบตู้' }
   }
 
-  // AABB collision check — use epsilon so touching faces (stacking) are allowed
+  // AABB collision — shrink by epsilon so touching faces (stacking) are valid
   const EPS = 0.1
-  const aMin = new THREE.Vector3(
-    newPos.x - movingBox.size.w / 2 + EPS,
-    newPos.y - movingBox.size.h / 2 + EPS,
-    newPos.z - movingBox.size.d / 2 + EPS
+  const aNew = new THREE.Box3(
+    new THREE.Vector3(
+      newPos.x - movingBox.size.w / 2 + EPS,
+      newPos.y - movingBox.size.h / 2 + EPS,
+      newPos.z - movingBox.size.d / 2 + EPS
+    ),
+    new THREE.Vector3(
+      newPos.x + movingBox.size.w / 2 - EPS,
+      newPos.y + movingBox.size.h / 2 - EPS,
+      newPos.z + movingBox.size.d / 2 - EPS
+    )
   )
-  const aMax = new THREE.Vector3(
-    newPos.x + movingBox.size.w / 2 - EPS,
-    newPos.y + movingBox.size.h / 2 - EPS,
-    newPos.z + movingBox.size.d / 2 - EPS
-  )
-  const aNew = new THREE.Box3(aMin, aMax)
 
   for (const other of otherBoxes) {
     if (other.id === movingBox.id) continue
