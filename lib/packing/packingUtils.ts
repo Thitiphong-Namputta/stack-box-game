@@ -1,9 +1,14 @@
 import * as THREE from 'three'
 import type { CargoBox, ContainerSize } from '@/store/useSceneStore'
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { BP3D } = require('binpackingjs')
+// binpackingjs has no type declarations — use require
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any
+const { BP3D } = require('binpackingjs') as any
 const { Item, Bin, Packer } = BP3D
+
+// binpackingjs scales every dimension by 1e5 internally.
+// All position/dimension values coming back must be divided by 1e5 to restore cm units.
+const SCALE = 1e5
 
 export function toPackingItem(box: CargoBox) {
   return new Item(box.id, box.size.w, box.size.h, box.size.d, box.weight ?? 0)
@@ -13,29 +18,38 @@ export function toPackingBin(size: ContainerSize) {
   return new Bin('container', size.w, size.h, size.d, size.maxWeight ?? 99999)
 }
 
+// Convert packed item's internal (scaled) position back to real-world cm, center of box
+function itemCenter(item: { position: number[]; width: number; height: number; depth: number }) {
+  return {
+    x: (item.position[0] + item.width / 2) / SCALE,
+    y: (item.position[1] + item.height / 2) / SCALE,
+    z: (item.position[2] + item.depth / 2) / SCALE,
+  }
+}
+
 export function suggestPosition(
   newBox: CargoBox,
   placedBoxes: CargoBox[],
   containerSize: ContainerSize
 ): THREE.Vector3 | null {
-  const packer = new Packer()
-  packer.addBin(toPackingBin(containerSize))
+  try {
+    const packer = new Packer()
+    packer.addBin(toPackingBin(containerSize))
+    placedBoxes.forEach((b) => packer.addItem(toPackingItem(b)))
+    packer.addItem(toPackingItem(newBox))
+    packer.pack()
 
-  placedBoxes.forEach((b) => packer.addItem(toPackingItem(b)))
-  packer.addItem(toPackingItem(newBox))
-  packer.pack()
+    const bin = packer.bins[0]
+    if (!bin) return null
 
-  const bin = packer.bins[0]
-  if (!bin) return null
+    const packed = bin.items.find((i: { name: string }) => i.name === newBox.id)
+    if (!packed) return null
 
-  const packed = bin.items.find((i: { name: string }) => i.name === newBox.id)
-  if (!packed) return null
-
-  return new THREE.Vector3(
-    packed.position[0] + packed.width / 2,
-    packed.position[1] + packed.height / 2,
-    packed.position[2] + packed.depth / 2
-  )
+    const c = itemCenter(packed)
+    return new THREE.Vector3(c.x, c.y, c.z)
+  } catch {
+    return null
+  }
 }
 
 export function validatePlacement(
@@ -80,22 +94,24 @@ export function runAutoPack(
   boxes: CargoBox[],
   containerSize: ContainerSize
 ): { packed: { id: string; position: { x: number; y: number; z: number } }[]; unfit: string[] } {
-  const packer = new Packer()
-  packer.addBin(toPackingBin(containerSize))
-  boxes.forEach((b) => packer.addItem(toPackingItem(b)))
-  packer.pack()
+  try {
+    const packer = new Packer()
+    packer.addBin(toPackingBin(containerSize))
+    boxes.forEach((b) => packer.addItem(toPackingItem(b)))
+    packer.pack()
 
-  const bin = packer.bins[0]
-  const packed = (bin?.items ?? []).map((item: { name: string; position: number[]; width: number; height: number; depth: number }) => ({
-    id: item.name,
-    position: {
-      x: item.position[0] + item.width / 2,
-      y: item.position[1] + item.height / 2,
-      z: item.position[2] + item.depth / 2,
-    },
-  }))
+    const bin = packer.bins[0]
+    const packed = (bin?.items ?? []).map(
+      (item: { name: string; position: number[]; width: number; height: number; depth: number }) => ({
+        id: item.name,
+        position: itemCenter(item),
+      })
+    )
 
-  const unfit = (packer.unfitItems ?? []).map((item: { name: string }) => item.name)
-
-  return { packed, unfit }
+    const unfit = (packer.unfitItems ?? []).map((item: { name: string }) => item.name)
+    return { packed, unfit }
+  } catch (e) {
+    console.error('AutoPack failed:', e)
+    return { packed: [], unfit: boxes.map((b) => b.id) }
+  }
 }

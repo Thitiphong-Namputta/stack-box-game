@@ -1,8 +1,9 @@
 'use client'
 
 import { useRef, useState, useCallback } from 'react'
+import * as THREE from 'three'
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls, Grid, Environment } from '@react-three/drei'
+import { OrbitControls, Grid } from '@react-three/drei'
 import { useSceneStore } from '@/store/useSceneStore'
 import { CargoContainer } from './CargoContainer'
 import { CargoBox } from './CargoBox'
@@ -28,7 +29,7 @@ export function SceneCanvas() {
 
   return (
     <Canvas
-      shadows
+      shadows={{ type: THREE.PCFShadowMap }}
       camera={{
         position: [containerSize.w * 1.2, containerSize.h * 1.5, containerSize.d * 1.5],
         fov: 50,
@@ -39,17 +40,16 @@ export function SceneCanvas() {
       className="w-full h-full"
     >
       {/* Lighting */}
-      <ambientLight intensity={0.6} />
+      <ambientLight intensity={0.8} />
       <directionalLight
         position={[containerSize.w, containerSize.h * 2, containerSize.d]}
-        intensity={1.5}
+        intensity={1.2}
         castShadow
-        shadow-mapSize={[2048, 2048]}
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
       />
-      <directionalLight position={[-200, 300, -200]} intensity={0.5} />
-
-      {/* Environment */}
-      <Environment preset="city" />
+      <directionalLight position={[-200, 300, -200]} intensity={0.4} />
+      <hemisphereLight args={['#334155', '#0f172a', 0.5]} />
 
       {/* Grid */}
       <Grid

@@ -6,7 +6,6 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Settings2, Wand2, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Slider } from '@/components/ui/slider'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
@@ -30,10 +29,6 @@ const containerSchema = z.object({
 })
 
 type ContainerForm = z.infer<typeof containerSchema>
-
-function toNum(v: number | readonly number[]): number {
-  return typeof v === 'number' ? v : v[0]
-}
 
 export function ControlPanel() {
   const {
@@ -92,13 +87,15 @@ export function ControlPanel() {
           <span className="text-xs text-slate-400">Snap Grid</span>
           <span className="text-xs font-mono text-white">{gridStep} ซม.</span>
         </div>
-        <Slider
-          value={[gridStep]}
-          onValueChange={(v) => setGridStep(toNum(v))}
+        <input
+          type="range"
+          aria-label="Snap grid size"
+          value={gridStep}
+          onChange={(e) => setGridStep(Number(e.target.value))}
           min={1}
           max={50}
           step={1}
-          className="w-full"
+          className="w-full accent-indigo-500 cursor-pointer"
         />
       </div>
 
@@ -108,13 +105,15 @@ export function ControlPanel() {
           <span className="text-xs text-slate-400">ความโปร่งใส Preview</span>
           <span className="text-xs font-mono text-white">{Math.round(ghostOpacity * 100)}%</span>
         </div>
-        <Slider
-          value={[ghostOpacity]}
-          onValueChange={(v) => setGhostOpacity(toNum(v))}
+        <input
+          type="range"
+          aria-label="Ghost preview opacity"
+          value={ghostOpacity}
+          onChange={(e) => setGhostOpacity(Number(e.target.value))}
           min={0.1}
           max={0.9}
           step={0.05}
-          className="w-full"
+          className="w-full accent-indigo-500 cursor-pointer"
         />
       </div>
 
