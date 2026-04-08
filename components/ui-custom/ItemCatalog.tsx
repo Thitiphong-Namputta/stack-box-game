@@ -56,7 +56,7 @@ export function ItemCatalog() {
 
   return (
     <Sheet>
-      <SheetTrigger className="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors">
+      <SheetTrigger className="inline-flex items-center gap-2 rounded-md border border-slate-700 bg-transparent px-3 py-1.5 text-sm font-medium text-slate-300 hover:bg-slate-700 hover:text-white transition-colors">
         <Package className="w-4 h-4" />
         รายการสินค้า
       </SheetTrigger>
