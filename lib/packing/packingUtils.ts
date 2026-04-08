@@ -70,11 +70,19 @@ export function validatePlacement(
     return { valid: false, reason: 'กล่องเกินขอบตู้' }
   }
 
-  // AABB collision check
-  const aNew = new THREE.Box3().setFromCenterAndSize(
-    newPos,
-    new THREE.Vector3(movingBox.size.w, movingBox.size.h, movingBox.size.d)
+  // AABB collision check — use epsilon so touching faces (stacking) are allowed
+  const EPS = 0.1
+  const aMin = new THREE.Vector3(
+    newPos.x - movingBox.size.w / 2 + EPS,
+    newPos.y - movingBox.size.h / 2 + EPS,
+    newPos.z - movingBox.size.d / 2 + EPS
   )
+  const aMax = new THREE.Vector3(
+    newPos.x + movingBox.size.w / 2 - EPS,
+    newPos.y + movingBox.size.h / 2 - EPS,
+    newPos.z + movingBox.size.d / 2 - EPS
+  )
+  const aNew = new THREE.Box3(aMin, aMax)
 
   for (const other of otherBoxes) {
     if (other.id === movingBox.id) continue

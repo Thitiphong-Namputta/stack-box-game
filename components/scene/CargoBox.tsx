@@ -6,7 +6,7 @@ import { useThree, ThreeEvent } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import { useSceneStore } from '@/store/useSceneStore'
 import { validatePlacement } from '@/lib/packing/packingUtils'
-import type { CargoBox as CargoBoxType } from '@/store/useSceneStore'
+import type { CargoBox as CargoBoxType, ContainerSize } from '@/store/useSceneStore'
 
 interface CargoBoxProps {
   box: CargoBoxType
@@ -16,6 +16,51 @@ interface CargoBoxProps {
 
 const snapToGrid = (v: number, step: number) => Math.round(v / step) * step
 
+/** Check if two boxes' X,Z footprints overlap (ignore Y entirely) */
+function footprintOverlaps(
+  ax: number, aw: number, az: number, ad: number,
+  bx: number, bw: number, bz: number, bd: number
+): boolean {
+  return (
+    ax - aw / 2 < bx + bw / 2 &&
+    ax + aw / 2 > bx - bw / 2 &&
+    az - ad / 2 < bz + bd / 2 &&
+    az + ad / 2 > bz - bd / 2
+  )
+}
+
+/**
+ * Compute the Y center of the dragged box using gravity-snap:
+ * - Find the highest support surface (top of another box whose footprint overlaps)
+ * - If no support → place on floor (y = box.size.h / 2)
+ * - Clamp so box doesn't exceed container top
+ */
+function computeSnapY(
+  x: number,
+  z: number,
+  dragging: CargoBoxType,
+  allBoxes: CargoBoxType[],
+  containerSize: ContainerSize
+): number {
+  let supportTop = 0 // floor
+
+  for (const other of allBoxes) {
+    if (other.id === dragging.id) continue
+    if (
+      footprintOverlaps(
+        x, dragging.size.w, z, dragging.size.d,
+        other.position.x, other.size.w, other.position.z, other.size.d
+      )
+    ) {
+      const otherTop = other.position.y + other.size.h / 2
+      if (otherTop > supportTop) supportTop = otherTop
+    }
+  }
+
+  const y = supportTop + dragging.size.h / 2
+  return Math.min(y, containerSize.h - dragging.size.h / 2)
+}
+
 export function CargoBox({ box, onDragStart, onDragEnd }: CargoBoxProps) {
   const { camera, gl } = useThree()
   const { selectedId, setSelected, moveBox, boxes, containerSize, gridStep, ghostOpacity } =
@@ -23,12 +68,10 @@ export function CargoBox({ box, onDragStart, onDragEnd }: CargoBoxProps) {
 
   const isSelected = selectedId === box.id
 
-  // Use refs for values accessed inside event listeners to avoid stale closure
   const isDraggingRef = useRef(false)
   const ghostPosRef = useRef<THREE.Vector3 | null>(null)
   const ghostValidRef = useRef(true)
 
-  // State only for rendering
   const [showGhost, setShowGhost] = useState(false)
   const [ghostRenderPos, setGhostRenderPos] = useState<THREE.Vector3>(
     new THREE.Vector3(box.position.x, box.position.y, box.position.z)
@@ -52,7 +95,8 @@ export function CargoBox({ box, onDragStart, onDragEnd }: CargoBoxProps) {
       e.stopPropagation()
       setSelected(box.id)
 
-      const dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -box.position.y)
+      // Use floor-level plane (y=0) to get X,Z from mouse — Y is computed separately
+      const dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
       const raycaster = new THREE.Raycaster()
 
       const onPointerMove = (me: PointerEvent) => {
@@ -68,24 +112,23 @@ export function CargoBox({ box, onDragStart, onDragEnd }: CargoBoxProps) {
         const intersection = new THREE.Vector3()
         if (!raycaster.ray.intersectPlane(dragPlane, intersection)) return
 
-        // Snap to grid
-        const snapped = new THREE.Vector3(
-          snapToGrid(intersection.x, gridStep),
-          box.position.y,
-          snapToGrid(intersection.z, gridStep)
-        )
+        // Snap X,Z to grid
+        const snappedX = snapToGrid(intersection.x, gridStep)
+        const snappedZ = snapToGrid(intersection.z, gridStep)
 
-        // Clamp inside container
-        snapped.x = Math.max(box.size.w / 2, Math.min(containerSize.w - box.size.w / 2, snapped.x))
-        snapped.z = Math.max(box.size.d / 2, Math.min(containerSize.d - box.size.d / 2, snapped.z))
+        // Clamp X,Z inside container
+        const clampedX = Math.max(box.size.w / 2, Math.min(containerSize.w - box.size.w / 2, snappedX))
+        const clampedZ = Math.max(box.size.d / 2, Math.min(containerSize.d - box.size.d / 2, snappedZ))
 
+        // Auto-gravity: find Y from support surface below X,Z
+        const snapY = computeSnapY(clampedX, clampedZ, box, boxes, containerSize)
+
+        const snapped = new THREE.Vector3(clampedX, snapY, clampedZ)
         const result = validatePlacement(box, snapped, boxes, containerSize)
 
-        // Update refs (always current)
         ghostPosRef.current = snapped.clone()
         ghostValidRef.current = result.valid
 
-        // Update state for rendering
         setGhostRenderPos(snapped.clone())
         setGhostRenderValid(result.valid)
       }
