@@ -1,6 +1,5 @@
 'use client'
 
-import { useRef } from 'react'
 import * as THREE from 'three'
 import { useSceneStore } from '@/store/useSceneStore'
 

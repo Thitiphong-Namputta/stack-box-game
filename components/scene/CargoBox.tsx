@@ -106,7 +106,7 @@ export function CargoBox({ box, onDragStart, onDragEnd }: CargoBoxProps) {
       document.addEventListener('pointermove', onPointerMove)
       document.addEventListener('pointerup', onPointerUp)
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
     [box, boxes, camera, containerSize, gridStep, moveBox, setSelected, getMouseNDC, onDragStart, onDragEnd]
   )
 

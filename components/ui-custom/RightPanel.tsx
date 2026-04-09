@@ -49,10 +49,7 @@ function hasAnyCollision(boxes: CargoBox[]): boolean {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div
-      className="text-[10px] font-bold uppercase tracking-widest"
-      style={{ color: 'color-mix(in srgb, var(--color-an-on-surface-variant) 50%, transparent)' }}
-    >
+    <div className="text-[10px] font-bold uppercase tracking-widest an-section-label">
       {children}
     </div>
   )
@@ -72,17 +69,14 @@ function UtilizationBar({
   return (
     <div>
       <div className="flex justify-between items-end mb-2">
-        <span className="text-xs font-medium" style={{ color: 'var(--color-an-on-surface)' }}>
-          {label}
-        </span>
+        <span className="text-xs font-medium an-text-on-surface">{label}</span>
+        {/* valueColor is a dynamic prop — cannot use a CSS class */}
         <span className="text-lg font-bold font-mono" style={{ color: valueColor }}>
           {value}%
         </span>
       </div>
-      <div
-        className="h-2 w-full rounded-full overflow-hidden"
-        style={{ background: 'var(--color-an-surface-variant)' }}
-      >
+      <div className="h-2 w-full rounded-full overflow-hidden an-util-bar-bg">
+        {/* width and gradient are dynamic props — cannot use CSS classes */}
         <div
           className="h-full rounded-full transition-all duration-500"
           style={{
@@ -107,7 +101,6 @@ export function RightPanel() {
     ? Math.round((totalWeight / containerSize.maxWeight) * 100)
     : 0
 
-  // Real constraint analysis
   const constraints = useMemo(() => {
     const weightOk = totalWeight <= (containerSize.maxWeight ?? Infinity)
     const volumeOk = spaceUtilization <= 100
@@ -142,20 +135,9 @@ export function RightPanel() {
   }
 
   return (
-    <aside
-      className="w-[320px] flex-shrink-0 flex flex-col z-40"
-      style={{
-        background: 'var(--color-an-surface-container-low)',
-        borderLeft: '1px solid color-mix(in srgb, var(--color-an-outline-variant) 5%, transparent)',
-      }}
-    >
+    <aside className="w-[320px] shrink-0 flex flex-col z-40 an-right-panel">
       {/* Utilization Metrics */}
-      <section
-        className="p-6 flex-shrink-0"
-        style={{
-          borderBottom: '1px solid color-mix(in srgb, var(--color-an-outline-variant) 5%, transparent)',
-        }}
-      >
+      <section className="p-6 shrink-0 an-section-border-bottom">
         <SectionLabel>Utilization Metrics</SectionLabel>
         <div className="space-y-6 mt-4">
           <UtilizationBar
@@ -175,16 +157,10 @@ export function RightPanel() {
 
       {/* Unfit items warning */}
       {unfitIds.length > 0 && (
-        <section
-          className="px-6 py-4 flex-shrink-0"
-          style={{
-            borderBottom: '1px solid color-mix(in srgb, var(--color-an-outline-variant) 5%, transparent)',
-            background: 'color-mix(in srgb, var(--color-an-error) 8%, transparent)',
-          }}
-        >
+        <section className="px-6 py-4 shrink-0 an-unfit-section">
           <div className="flex items-center gap-2 mb-2">
-            <AlertTriangle className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--color-an-error)' }} />
-            <span className="text-xs font-bold" style={{ color: 'var(--color-an-error)' }}>
+            <AlertTriangle className="w-4 h-4 shrink-0 an-text-error" />
+            <span className="text-xs font-bold an-text-error">
               {unfitIds.length} item{unfitIds.length > 1 ? 's' : ''} could not be packed
             </span>
           </div>
@@ -192,14 +168,7 @@ export function RightPanel() {
             {unfitIds.map((id) => {
               const box = boxes.find((b) => b.id === id)
               return box ? (
-                <div
-                  key={id}
-                  className="text-[11px] font-mono px-2 py-0.5 rounded"
-                  style={{
-                    color: 'var(--color-an-error)',
-                    background: 'color-mix(in srgb, var(--color-an-error) 10%, transparent)',
-                  }}
-                >
+                <div key={id} className="text-[11px] font-mono px-2 py-0.5 rounded an-unfit-item-badge">
                   {box.name} ({box.size.w}×{box.size.h}×{box.size.d})
                 </div>
               ) : null
@@ -209,42 +178,23 @@ export function RightPanel() {
       )}
 
       {/* Constraint Analysis */}
-      <section
-        className="p-6 flex-shrink-0"
-        style={{
-          borderBottom: '1px solid color-mix(in srgb, var(--color-an-outline-variant) 5%, transparent)',
-        }}
-      >
+      <section className="p-6 shrink-0 an-section-border-bottom">
         <SectionLabel>Constraint Analysis</SectionLabel>
         <div className="space-y-3 mt-4">
           {constraints.map(({ label, pass }) => (
             <div
               key={label}
-              className="flex items-center justify-between p-2 rounded-lg"
-              style={{
-                background: 'var(--color-an-surface-container)',
-                border: !pass
-                  ? '1px solid color-mix(in srgb, var(--color-an-error) 20%, transparent)'
-                  : '1px solid transparent',
-              }}
+              className={`flex items-center justify-between p-2 rounded-lg ${pass ? 'an-constraint-item' : 'an-constraint-item-fail'}`}
             >
               <div className="flex items-center gap-3">
                 {pass ? (
-                  <CheckCircle2 className="w-4 h-4" style={{ color: 'var(--color-an-tertiary)' }} />
+                  <CheckCircle2 className="w-4 h-4 an-text-tertiary" />
                 ) : (
-                  <XCircle className="w-4 h-4" style={{ color: 'var(--color-an-error)' }} />
+                  <XCircle className="w-4 h-4 an-text-error" />
                 )}
-                <span className="text-xs" style={{ color: 'var(--color-an-on-surface)' }}>
-                  {label}
-                </span>
+                <span className="text-xs an-text-on-surface">{label}</span>
               </div>
-              <span
-                className="text-[10px] font-mono"
-                style={{
-                  color: pass ? 'var(--color-an-on-surface-variant)' : 'var(--color-an-error)',
-                  fontWeight: pass ? 'normal' : 'bold',
-                }}
-              >
+              <span className={`text-[10px] font-mono ${pass ? 'an-constraint-pass' : 'an-constraint-fail'}`}>
                 {pass ? 'PASS' : 'FAIL'}
               </span>
             </div>
@@ -267,53 +217,16 @@ export function RightPanel() {
                 { label: 'Height', value: `${selected.size.h}.0 cm` },
                 { label: 'Weight', value: `${selected.weight} kg` },
               ].map(({ label, value }) => (
-                <div
-                  key={label}
-                  className="p-3 rounded-lg"
-                  style={{
-                    background:
-                      'color-mix(in srgb, var(--color-an-surface-container-highest) 50%, transparent)',
-                  }}
-                >
-                  <div
-                    className="text-[10px] uppercase mb-1"
-                    style={{
-                      color:
-                        'color-mix(in srgb, var(--color-an-on-surface-variant) 60%, transparent)',
-                    }}
-                  >
-                    {label}
-                  </div>
-                  <div
-                    className="font-mono font-bold text-sm"
-                    style={{ color: 'var(--color-an-on-surface)' }}
-                  >
-                    {value}
-                  </div>
+                <div key={label} className="p-3 rounded-lg an-stat-card">
+                  <div className="text-[10px] uppercase mb-1 an-stat-label">{label}</div>
+                  <div className="font-mono font-bold text-sm an-text-on-surface">{value}</div>
                 </div>
               ))}
             </div>
 
-            <div
-              className="mt-3 p-3 rounded-lg"
-              style={{
-                background:
-                  'color-mix(in srgb, var(--color-an-surface-container-highest) 50%, transparent)',
-              }}
-            >
-              <div
-                className="text-[10px] uppercase mb-1"
-                style={{
-                  color:
-                    'color-mix(in srgb, var(--color-an-on-surface-variant) 60%, transparent)',
-                }}
-              >
-                Volume
-              </div>
-              <div
-                className="font-mono font-bold text-sm"
-                style={{ color: 'var(--color-an-on-surface)' }}
-              >
+            <div className="mt-3 p-3 rounded-lg an-stat-card">
+              <div className="text-[10px] uppercase mb-1 an-stat-label">Volume</div>
+              <div className="font-mono font-bold text-sm an-text-on-surface">
                 {(
                   (selected.size.w * selected.size.h * selected.size.d) /
                   1_000_000
@@ -323,33 +236,18 @@ export function RightPanel() {
             </div>
           </>
         ) : (
-          <div
-            className="flex flex-col items-center justify-center py-12 gap-3 mt-4"
-            style={{ color: 'var(--color-an-on-surface-variant)', opacity: 0.4 }}
-          >
+          <div className="flex flex-col items-center justify-center py-12 gap-3 mt-4 an-text-on-surface-muted opacity-40">
             <span className="text-xs">Click a box to inspect</span>
           </div>
         )}
 
         {/* Export */}
-        <div
-          className="mt-6 pt-6"
-          style={{
-            borderTop:
-              '1px solid color-mix(in srgb, var(--color-an-outline-variant) 5%, transparent)',
-          }}
-        >
+        <div className="mt-6 pt-6 an-section-border-top">
           <button
             type="button"
             onClick={handleExport}
             disabled={boxes.length === 0}
-            className="w-full py-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all hover:opacity-80 disabled:opacity-30"
-            style={{
-              background: 'rgba(255,255,255,0.05)',
-              color: 'var(--color-an-on-surface)',
-              border:
-                '1px solid color-mix(in srgb, var(--color-an-outline-variant) 10%, transparent)',
-            }}
+            className="w-full py-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all hover:opacity-80 disabled:opacity-30 an-btn-export"
           >
             <Download className="w-3.5 h-3.5" />
             Export Plan (.JSON)

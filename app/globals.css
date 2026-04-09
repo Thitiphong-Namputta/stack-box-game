@@ -47,21 +47,21 @@
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
 
-  /* Architect Navigator design tokens */
-  --color-an-surface: #0b1326;
-  --color-an-surface-container-low: #131b2e;
-  --color-an-surface-container: #171f33;
-  --color-an-surface-container-high: #222a3d;
-  --color-an-surface-container-highest: #2d3449;
-  --color-an-surface-variant: #2d3449;
-  --color-an-primary: #adc7ff;
-  --color-an-on-primary: #002e68;
-  --color-an-on-primary-container: #5393ff;
-  --color-an-tertiary: #4edea3;
-  --color-an-error: #ffb4ab;
-  --color-an-on-surface: #dae2fd;
-  --color-an-on-surface-variant: #c4c6d2;
-  --color-an-outline-variant: #444650;
+  /* Architect Navigator design tokens — aliased to bare vars for theme switching */
+  --color-an-surface:                   var(--an-surface);
+  --color-an-surface-container-low:     var(--an-surface-container-low);
+  --color-an-surface-container:         var(--an-surface-container);
+  --color-an-surface-container-high:    var(--an-surface-container-high);
+  --color-an-surface-container-highest: var(--an-surface-container-highest);
+  --color-an-surface-variant:           var(--an-surface-variant);
+  --color-an-primary:                   var(--an-primary);
+  --color-an-on-primary:                var(--an-on-primary);
+  --color-an-on-primary-container:      var(--an-on-primary-container);
+  --color-an-tertiary:                  var(--an-tertiary);
+  --color-an-error:                     var(--an-error);
+  --color-an-on-surface:                var(--an-on-surface);
+  --color-an-on-surface-variant:        var(--an-on-surface-variant);
+  --color-an-outline-variant:           var(--an-outline-variant);
 }
 
 :root {
@@ -97,6 +97,27 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /* AN light tokens */
+  --an-surface:                   #f8f9ff;
+  --an-surface-container-low:     #eef0fc;
+  --an-surface-container:         #e8eaf6;
+  --an-surface-container-high:    #dde0f0;
+  --an-surface-container-highest: #d0d4e8;
+  --an-surface-variant:           #dde3f3;
+  --an-primary:                   #2558c8;
+  --an-on-primary:                #ffffff;
+  --an-on-primary-container:      #1a3f8f;
+  --an-tertiary:                  #1a7a5e;
+  --an-error:                     #ba1a1a;
+  --an-on-surface:                #10131f;
+  --an-on-surface-variant:        #44475a;
+  --an-outline-variant:           #c4c6d2;
+  /* AN light utility vars */
+  --an-glass-bg:             rgba(220, 224, 240, 0.75);
+  --an-shadow-deep:          rgba(16, 19, 31, 0.15);
+  --an-toolbar-border-color: rgba(0, 0, 0, 0.06);
+  --an-divider-color:        rgba(0, 0, 0, 0.08);
 }
 
 .dark {
@@ -131,18 +152,224 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+
+  /* AN dark tokens */
+  --an-surface:                   #0b1326;
+  --an-surface-container-low:     #131b2e;
+  --an-surface-container:         #171f33;
+  --an-surface-container-high:    #222a3d;
+  --an-surface-container-highest: #2d3449;
+  --an-surface-variant:           #2d3449;
+  --an-primary:                   #adc7ff;
+  --an-on-primary:                #002e68;
+  --an-on-primary-container:      #5393ff;
+  --an-tertiary:                  #4edea3;
+  --an-error:                     #ffb4ab;
+  --an-on-surface:                #dae2fd;
+  --an-on-surface-variant:        #c4c6d2;
+  --an-outline-variant:           #444650;
+  /* AN dark utility vars */
+  --an-glass-bg:             rgba(45, 52, 73, 0.6);
+  --an-shadow-deep:          rgba(6, 14, 32, 0.5);
+  --an-toolbar-border-color: rgba(255, 255, 255, 0.05);
+  --an-divider-color:        rgba(255, 255, 255, 0.1);
 }
 
 .an-canvas-grid {
-  background-image: radial-gradient(circle, #2d3449 1px, transparent 1px);
+  background-image: radial-gradient(circle, var(--color-an-surface-container-highest) 1px, transparent 1px);
   background-size: 32px 32px;
 }
 
 .an-glass {
-  background: rgba(45, 52, 73, 0.6);
+  background: var(--an-glass-bg);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
 }
+
+/* Architect Navigator utility classes */
+.an-bg-surface            { background: var(--color-an-surface); }
+.an-bg-surface-low        { background: var(--color-an-surface-container-low); }
+.an-bg-surface-container  { background: var(--color-an-surface-container); }
+.an-text-primary          { color: var(--color-an-primary); }
+.an-text-on-surface       { color: var(--color-an-on-surface); }
+.an-text-on-surface-muted { color: var(--color-an-on-surface-variant); }
+.an-text-on-primary       { color: var(--color-an-on-primary); }
+
+.an-undo-redo-group {
+  background: var(--color-an-surface-container-low);
+  border: 1px solid color-mix(in srgb, var(--color-an-outline-variant) 10%, transparent);
+}
+.an-divider-subtle {
+  background: color-mix(in srgb, var(--color-an-outline-variant) 20%, transparent);
+}
+.an-btn-autopack {
+  background: linear-gradient(135deg, var(--color-an-primary), var(--color-an-on-primary-container));
+  color: var(--color-an-on-primary);
+}
+.an-breadcrumb {
+  background: var(--color-an-surface-container-low);
+  color: color-mix(in srgb, var(--color-an-on-surface-variant) 60%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-an-outline-variant) 5%, transparent);
+}
+.an-sidebar {
+  background: var(--color-an-surface-container-low);
+  border-right: 1px solid color-mix(in srgb, var(--color-an-outline-variant) 5%, transparent);
+  box-shadow: 12px 0 32px var(--an-shadow-deep);
+}
+.an-tab-active {
+  background: var(--color-an-surface-container);
+  color: var(--color-an-primary);
+  border: 1px solid color-mix(in srgb, var(--color-an-primary) 10%, transparent);
+}
+.an-tab-inactive {
+  color: var(--color-an-on-surface-variant);
+  background: transparent;
+  border: 1px solid transparent;
+}
+.an-toolbar-border {
+  border: 1px solid var(--an-toolbar-border-color);
+  box-shadow: 0 12px 32px var(--an-shadow-deep);
+}
+.an-toolbar-section-divider {
+  border-right: 1px solid var(--an-divider-color);
+}
+.an-toolbar-view-active {
+  color: var(--color-an-primary);
+  background: color-mix(in srgb, var(--color-an-primary) 15%, transparent);
+}
+.an-toolbar-view-inactive {
+  color: var(--color-an-on-surface-variant);
+  background: transparent;
+}
+.an-render-btn-active {
+  color: var(--color-an-primary);
+  background: color-mix(in srgb, var(--color-an-primary) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-an-primary) 20%, transparent);
+}
+.an-render-btn-inactive {
+  color: var(--color-an-on-surface-variant);
+  background: transparent;
+  border: 1px solid transparent;
+}
+.an-hud-btn {
+  border: 1px solid var(--an-divider-color);
+  color: var(--color-an-on-surface);
+}
+.an-nav-active {
+  color: var(--color-an-primary);
+  border-bottom: 2px solid var(--color-an-primary);
+  padding-bottom: 2px;
+}
+.an-nav-inactive {
+  color: var(--color-an-on-surface-variant);
+}
+
+/* ── Additional AN utility classes ─────────────────────────────── */
+.an-text-tertiary          { color: var(--color-an-tertiary); }
+.an-text-error             { color: var(--color-an-error); }
+.an-bg-surface-variant     { background: var(--color-an-surface-variant); }
+
+.an-section-label {
+  color: color-mix(in srgb, var(--color-an-on-surface-variant) 50%, transparent);
+}
+.an-section-border-bottom {
+  border-bottom: 1px solid color-mix(in srgb, var(--color-an-outline-variant) 5%, transparent);
+}
+.an-section-border-top {
+  border-top: 1px solid color-mix(in srgb, var(--color-an-outline-variant) 5%, transparent);
+}
+.an-right-panel {
+  background: var(--color-an-surface-container-low);
+  border-left: 1px solid color-mix(in srgb, var(--color-an-outline-variant) 5%, transparent);
+}
+.an-container-info {
+  background: var(--color-an-surface-container);
+  color: var(--color-an-on-surface-variant);
+}
+.an-btn-outline-primary {
+  background: color-mix(in srgb, var(--color-an-primary) 10%, transparent);
+  color: var(--color-an-primary);
+  border: 1px solid color-mix(in srgb, var(--color-an-primary) 15%, transparent);
+}
+.an-dialog-content {
+  background: var(--color-an-surface-container-low);
+  color: var(--color-an-on-surface);
+  border: 1px solid color-mix(in srgb, var(--color-an-outline-variant) 15%, transparent);
+}
+.an-input {
+  background: var(--color-an-surface-variant);
+  border-color: color-mix(in srgb, var(--color-an-outline-variant) 20%, transparent);
+  color: var(--color-an-on-surface);
+}
+.an-btn-danger-ghost {
+  color: var(--color-an-error);
+  background: transparent;
+}
+.an-count-footer {
+  color: var(--color-an-on-surface-variant);
+  opacity: 0.5;
+  border-top: 1px solid color-mix(in srgb, var(--color-an-outline-variant) 5%, transparent);
+}
+.an-unfit-section {
+  border-bottom: 1px solid color-mix(in srgb, var(--color-an-outline-variant) 5%, transparent);
+  background: color-mix(in srgb, var(--color-an-error) 8%, transparent);
+}
+.an-unfit-item-badge {
+  color: var(--color-an-error);
+  background: color-mix(in srgb, var(--color-an-error) 10%, transparent);
+}
+.an-constraint-item {
+  background: var(--color-an-surface-container);
+  border: 1px solid transparent;
+}
+.an-constraint-item-fail {
+  background: var(--color-an-surface-container);
+  border: 1px solid color-mix(in srgb, var(--color-an-error) 20%, transparent);
+}
+.an-constraint-pass { color: var(--color-an-on-surface-variant); }
+.an-constraint-fail { color: var(--color-an-error); font-weight: bold; }
+.an-stat-card {
+  background: color-mix(in srgb, var(--color-an-surface-container-highest) 50%, transparent);
+}
+.an-stat-label {
+  color: color-mix(in srgb, var(--color-an-on-surface-variant) 60%, transparent);
+}
+.an-util-bar-bg { background: var(--color-an-surface-variant); }
+.an-btn-export {
+  background: var(--an-toolbar-border-color);
+  color: var(--color-an-on-surface);
+  border: 1px solid color-mix(in srgb, var(--color-an-outline-variant) 10%, transparent);
+}
+.an-manifest-item {
+  background: var(--color-an-surface-container);
+  border: 1px solid transparent;
+}
+.an-manifest-item-active {
+  background: var(--color-an-surface-container-highest);
+  border: 1px solid color-mix(in srgb, var(--color-an-primary) 20%, transparent);
+}
+.an-badge-packed {
+  background: color-mix(in srgb, var(--color-an-tertiary) 10%, transparent);
+  color: var(--color-an-tertiary);
+}
+.an-badge-unfit {
+  background: color-mix(in srgb, var(--color-an-error) 12%, transparent);
+  color: var(--color-an-error);
+}
+.an-btn-delete-sm {
+  color: var(--color-an-error);
+  background: color-mix(in srgb, var(--color-an-error) 10%, transparent);
+}
+.an-sheet-content {
+  background: var(--color-an-surface-container-low);
+  color: var(--color-an-on-surface);
+}
+.an-separator {
+  background: color-mix(in srgb, var(--color-an-outline-variant) 15%, transparent);
+}
+.an-range-input { accent-color: var(--color-an-primary); }
+.an-catalog-item { cursor: pointer; }
+.an-catalog-item:hover { background: var(--color-an-surface-container); }
 
 @layer base {
   * {

@@ -23,11 +23,12 @@ export function InfoPanel() {
     <div className="p-3 space-y-3">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded-sm flex-shrink-0" style={{ backgroundColor: selected.color }} />
+          {/* backgroundColor is dynamic (per-box color) — cannot use a CSS class */}
+          <div className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: selected.color }} />
           <span className="text-sm font-semibold text-white leading-tight">{selected.name}</span>
         </div>
         {selected.category && (
-          <Badge variant="secondary" className="text-xs bg-slate-700 text-slate-300 flex-shrink-0">
+          <Badge variant="secondary" className="text-xs bg-slate-700 text-slate-300 shrink-0">
             {selected.category}
           </Badge>
         )}

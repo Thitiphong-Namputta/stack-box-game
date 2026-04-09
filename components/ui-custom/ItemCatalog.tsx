@@ -21,64 +21,38 @@ function ManifestItemCard({ box }: { box: CargoBox }) {
   return (
     <div
       onClick={() => setSelected(isSelected ? null : box.id)}
-      className="p-3 rounded-lg cursor-pointer transition-all group"
-      style={{
-        background: isSelected
-          ? 'var(--color-an-surface-container-highest)'
-          : 'var(--color-an-surface-container)',
-        border: isSelected
-          ? '1px solid color-mix(in srgb, var(--color-an-primary) 20%, transparent)'
-          : '1px solid transparent',
-      }}
+      className={`p-3 rounded-lg cursor-pointer transition-all group ${isSelected ? 'an-manifest-item-active' : 'an-manifest-item'}`}
     >
       {/* Row 1: color dot + name + status badge */}
       <div className="flex justify-between items-start mb-2">
         <div className="flex items-center gap-2">
+          {/* backgroundColor and boxShadow are dynamic (per-box color) — cannot use CSS classes */}
           <div
-            className="w-3 h-3 rounded-sm flex-shrink-0"
+            className="w-3 h-3 rounded-sm shrink-0"
             style={{
               backgroundColor: box.color,
               boxShadow: `0 0 8px ${box.color}66`,
             }}
           />
-          <span
-            className="text-xs font-mono font-semibold tracking-tight"
-            style={{ color: 'var(--color-an-on-surface)' }}
-          >
+          <span className="text-xs font-mono font-semibold tracking-tight an-text-on-surface">
             {box.name}
           </span>
         </div>
-        <span
-          className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase shrink-0"
-          style={
-            isUnfit
-              ? {
-                  background: 'color-mix(in srgb, var(--color-an-error) 12%, transparent)',
-                  color: 'var(--color-an-error)',
-                }
-              : {
-                  background: 'color-mix(in srgb, var(--color-an-tertiary) 10%, transparent)',
-                  color: 'var(--color-an-tertiary)',
-                }
-          }
-        >
+        <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase shrink-0 ${isUnfit ? 'an-badge-unfit' : 'an-badge-packed'}`}>
           {isUnfit ? 'Unfit' : 'Packed'}
         </span>
       </div>
 
       {/* Row 2: dimensions + weight */}
-      <div
-        className="grid grid-cols-2 gap-2 text-[10px]"
-        style={{ color: 'var(--color-an-on-surface-variant)' }}
-      >
+      <div className="grid grid-cols-2 gap-2 text-[10px] an-text-on-surface-muted">
         <div>
-          <span style={{ opacity: 0.4 }}>DIM: </span>
+          <span className="opacity-40">DIM: </span>
           <span className="font-mono">
             {box.size.w}×{box.size.h}×{box.size.d}
           </span>
         </div>
         <div>
-          <span style={{ opacity: 0.4 }}>WT: </span>
+          <span className="opacity-40">WT: </span>
           <span className="font-mono">{box.weight}kg</span>
         </div>
       </div>
@@ -91,11 +65,7 @@ function ManifestItemCard({ box }: { box: CargoBox }) {
             e.stopPropagation()
             removeBox(box.id)
           }}
-          className="text-[10px] px-2 py-1 rounded transition-colors inline-flex items-center justify-center gap-1 cursor-pointer leading-none"
-          style={{
-            color: 'var(--color-an-error)',
-            background: 'color-mix(in srgb, var(--color-an-error) 10%, transparent)',
-          }}
+          className="text-[10px] px-2 py-1 rounded transition-colors inline-flex items-center justify-center gap-1 cursor-pointer leading-none an-btn-delete-sm"
         >
           <Trash2 className="w-3 h-3" />
           Delete
@@ -107,7 +77,7 @@ function ManifestItemCard({ box }: { box: CargoBox }) {
 
 // ── ItemsTab ────────────────────────────────────────────────────────
 export function ItemsTab() {
-  const { addBox, boxes, containerSize } = useSceneStore()
+  const { addBox, boxes } = useSceneStore()
   const { getSuggestedPosition } = useBinPacking()
   const [showCatalog, setShowCatalog] = useState(false)
   const [search, setSearch] = useState('')
@@ -145,12 +115,7 @@ export function ItemsTab() {
   return (
     <div className="flex flex-col h-full">
       {/* Section label */}
-      <div
-        className="text-[10px] font-bold uppercase tracking-widest mb-2 px-1"
-        style={{
-          color: 'color-mix(in srgb, var(--color-an-on-surface-variant) 50%, transparent)',
-        }}
-      >
+      <div className="text-[10px] font-bold uppercase tracking-widest mb-2 px-1 an-section-label">
         Manifest ({boxes.length} Items)
       </div>
 
@@ -160,10 +125,7 @@ export function ItemsTab() {
           <ManifestItemCard key={box.id} box={box} />
         ))}
         {boxes.length === 0 && (
-          <div
-            className="flex flex-col items-center justify-center py-12 gap-3"
-            style={{ color: 'var(--color-an-on-surface-variant)', opacity: 0.4 }}
-          >
+          <div className="flex flex-col items-center justify-center py-12 gap-3 an-text-on-surface-muted opacity-40">
             <Box className="w-8 h-8" />
             <span className="text-xs">No items in manifest</span>
           </div>
@@ -171,21 +133,11 @@ export function ItemsTab() {
       </div>
 
       {/* Footer: Add Item */}
-      <div
-        className="pt-4 mt-4 flex-shrink-0"
-        style={{
-          borderTop:
-            '1px solid color-mix(in srgb, var(--color-an-outline-variant) 5%, transparent)',
-        }}
-      >
+      <div className="pt-4 mt-4 shrink-0 an-section-border-top">
         <button
           type="button"
           onClick={() => setShowCatalog(true)}
-          className="w-full py-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all hover:opacity-80"
-          style={{
-            background: 'color-mix(in srgb, var(--color-an-primary) 10%, transparent)',
-            color: 'var(--color-an-primary)',
-          }}
+          className="w-full py-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all hover:opacity-80 an-btn-outline-primary"
         >
           <Plus className="w-4 h-4" />
           Add Item
@@ -194,21 +146,10 @@ export function ItemsTab() {
 
       {/* Catalog Sheet */}
       <Sheet open={showCatalog} onOpenChange={setShowCatalog}>
-        <SheetContent
-          side="left"
-          className="w-80 p-6"
-          style={{
-            background: 'var(--color-an-surface-container-low)',
-            color: 'var(--color-an-on-surface)',
-            border: 'none',
-          }}
-        >
+        <SheetContent side="left" className="w-80 p-6 an-sheet-content">
           <SheetHeader>
-            <SheetTitle
-              className="flex items-center gap-2"
-              style={{ color: 'var(--color-an-on-surface)' }}
-            >
-              <Package className="w-5 h-5" style={{ color: 'var(--color-an-primary)' }} />
+            <SheetTitle className="flex items-center gap-2 an-text-on-surface">
+              <Package className="w-5 h-5 an-text-primary" />
               Item Catalog
             </SheetTitle>
           </SheetHeader>
@@ -218,11 +159,7 @@ export function ItemsTab() {
               placeholder="Search items..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              style={{
-                background: 'var(--color-an-surface-container)',
-                borderColor: 'color-mix(in srgb, var(--color-an-outline-variant) 20%, transparent)',
-                color: 'var(--color-an-on-surface)',
-              }}
+              className="an-input"
             />
           </div>
 
@@ -232,68 +169,40 @@ export function ItemsTab() {
               if (items.length === 0) return null
               return (
                 <div key={category} className="mb-4">
-                  <div
-                    className="text-xs font-semibold uppercase tracking-wider mb-2 px-1"
-                    style={{ color: 'var(--color-an-on-surface-variant)' }}
-                  >
+                  <div className="text-xs font-semibold uppercase tracking-wider mb-2 px-1 an-text-on-surface-muted">
                     {category}
                   </div>
                   {items.map((item) => (
                     <div
                       key={item.name}
-                      className="flex items-center justify-between p-3 rounded-lg mb-1 group transition-colors"
-                      style={{
-                        cursor: 'pointer',
-                      }}
-                      onMouseEnter={(e) => {
-                        ;(e.currentTarget as HTMLDivElement).style.background =
-                          'var(--color-an-surface-container)'
-                      }}
-                      onMouseLeave={(e) => {
-                        ;(e.currentTarget as HTMLDivElement).style.background = 'transparent'
-                      }}
+                      className="flex items-center justify-between p-3 rounded-lg mb-1 group transition-colors an-catalog-item"
+                      onClick={() => handleAdd(item)}
                     >
                       <div className="flex-1 min-w-0">
-                        <div
-                          className="text-sm font-medium truncate"
-                          style={{ color: 'var(--color-an-on-surface)' }}
-                        >
+                        <div className="text-sm font-medium truncate an-text-on-surface">
                           {item.name}
                         </div>
-                        <div
-                          className="text-xs mt-0.5 font-mono"
-                          style={{ color: 'var(--color-an-on-surface-variant)' }}
-                        >
+                        <div className="text-xs mt-0.5 font-mono an-text-on-surface-muted">
                           {item.size.w}×{item.size.h}×{item.size.d} cm · {item.weight} kg
                         </div>
                       </div>
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="opacity-0 group-hover:opacity-100 ml-2 h-7 w-7 p-0 transition-opacity"
-                        style={{ color: 'var(--color-an-primary)' }}
-                        onClick={() => handleAdd(item)}
+                        className="opacity-0 group-hover:opacity-100 ml-2 h-7 w-7 p-0 transition-opacity an-text-primary"
+                        onClick={(e) => { e.stopPropagation(); handleAdd(item) }}
                       >
                         <Plus className="w-4 h-4" />
                       </Button>
                     </div>
                   ))}
-                  <Separator
-                    className="mt-2"
-                    style={{
-                      background:
-                        'color-mix(in srgb, var(--color-an-outline-variant) 15%, transparent)',
-                    }}
-                  />
+                  <Separator className="mt-2 an-separator" />
                 </div>
               )
             })}
           </ScrollArea>
 
-          <div
-            className="mt-2 text-xs text-center"
-            style={{ color: 'var(--color-an-on-surface-variant)', opacity: 0.6 }}
-          >
+          <div className="mt-2 text-xs text-center an-text-on-surface-muted opacity-60">
             {boxes.length} items in manifest
           </div>
         </SheetContent>
