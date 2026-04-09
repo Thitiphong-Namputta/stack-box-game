@@ -46,6 +46,22 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* Architect Navigator design tokens */
+  --color-an-surface: #0b1326;
+  --color-an-surface-container-low: #131b2e;
+  --color-an-surface-container: #171f33;
+  --color-an-surface-container-high: #222a3d;
+  --color-an-surface-container-highest: #2d3449;
+  --color-an-surface-variant: #2d3449;
+  --color-an-primary: #adc7ff;
+  --color-an-on-primary: #002e68;
+  --color-an-on-primary-container: #5393ff;
+  --color-an-tertiary: #4edea3;
+  --color-an-error: #ffb4ab;
+  --color-an-on-surface: #dae2fd;
+  --color-an-on-surface-variant: #c4c6d2;
+  --color-an-outline-variant: #444650;
 }
 
 :root {
@@ -115,6 +131,17 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+}
+
+.an-canvas-grid {
+  background-image: radial-gradient(circle, #2d3449 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.an-glass {
+  background: rgba(45, 52, 73, 0.6);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
 }
 
 @layer base {
