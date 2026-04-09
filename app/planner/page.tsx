@@ -1,6 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   Zap,
   Undo2,
@@ -41,6 +43,7 @@ function PlannerHeader() {
   const { boxes, moveAllBoxes, setUnfitIds, history, future, undo, redo } =
     useSceneStore();
   const { autoPack } = useBinPacking();
+  const pathname = usePathname();
 
   const handleAutoPack = () => {
     if (boxes.length === 0) return;
@@ -50,30 +53,31 @@ function PlannerHeader() {
   };
 
   const navItems = [
-    { label: "Dashboard", active: false },
-    { label: "3D Planner", active: true },
-    { label: "Load Plans", active: false },
-    { label: "Catalog", active: false },
+    { label: "Dashboard", href: "/" },
+    { label: "3D Planner", href: "/planner" },
+    { label: "Load Plans", href: "/load-plans" },
+    { label: "Catalog", href: "/catalog" },
   ];
 
   return (
     <header className="h-16 flex items-center justify-between px-6 z-50 shrink-0 an-bg-surface">
       {/* Left: Logo + Nav */}
       <div className="flex items-center gap-8">
-        <div className="flex items-center gap-2">
+        <Link href="/" className="flex items-center gap-2">
           <Box className="w-5 h-5 an-text-primary" />
           <span className="text-xl font-bold tracking-tighter an-text-primary">
             3D Cargo Planner
           </span>
-        </div>
+        </Link>
         <nav className="hidden md:flex items-center gap-6">
-          {navItems.map(({ label, active }) => (
-            <span
-              key={label}
-              className={`text-sm cursor-pointer transition-colors duration-200 ${active ? "an-nav-active" : "an-nav-inactive"}`}
+          {navItems.map(({ label, href }) => (
+            <Link
+              key={href}
+              href={href}
+              className={`text-sm transition-colors duration-200 ${pathname === href ? "an-nav-active" : "an-nav-inactive"}`}
             >
               {label}
-            </span>
+            </Link>
           ))}
         </nav>
       </div>
