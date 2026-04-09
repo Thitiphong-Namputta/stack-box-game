@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import dynamic from 'next/dynamic'
 import {
   Zap,
@@ -22,6 +21,7 @@ import { ContainerTab } from '@/components/ui-custom/ControlPanel'
 import { RightPanel } from '@/components/ui-custom/RightPanel'
 import { useSceneStore } from '@/store/useSceneStore'
 import { useBinPacking } from '@/lib/packing/useBinPacking'
+import type { ViewMode, RenderMode } from '@/store/useSceneStore'
 
 const SceneCanvas = dynamic(
   () => import('@/components/scene/SceneCanvas').then((m) => m.SceneCanvas),
@@ -40,13 +40,14 @@ const SceneCanvas = dynamic(
 
 // ── Header ──────────────────────────────────────────────────────────
 function PlannerHeader() {
-  const { boxes, moveAllBoxes } = useSceneStore()
+  const { boxes, moveAllBoxes, setUnfitIds, history, future, undo, redo } = useSceneStore()
   const { autoPack } = useBinPacking()
 
   const handleAutoPack = () => {
     if (boxes.length === 0) return
-    const { packed } = autoPack()
+    const { packed, unfit } = autoPack()
     moveAllBoxes(packed)
+    setUnfitIds(unfit)
   }
 
   const navItems = [
@@ -96,23 +97,35 @@ function PlannerHeader() {
       {/* Right: Undo/Redo + Auto-pack */}
       <div className="flex items-center gap-4">
         <div
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
+          className="flex items-center gap-1 px-2 py-1.5 rounded-lg"
           style={{
             background: 'var(--color-an-surface-container-low)',
             border: '1px solid color-mix(in srgb, var(--color-an-outline-variant) 10%, transparent)',
           }}
         >
-          <Undo2 className="w-4 h-4" style={{ color: 'var(--color-an-primary)' }} />
-          <Redo2
-            className="w-4 h-4"
-            style={{ color: 'var(--color-an-on-surface-variant)', opacity: 0.4 }}
-          />
+          <button
+            type="button"
+            title="Undo (Ctrl+Z)"
+            onClick={undo}
+            disabled={history.length === 0}
+            className="p-1 rounded transition-opacity disabled:opacity-30 hover:opacity-70"
+          >
+            <Undo2 className="w-4 h-4" style={{ color: 'var(--color-an-primary)' }} />
+          </button>
+          <button
+            type="button"
+            title="Redo (Ctrl+Y)"
+            onClick={redo}
+            disabled={future.length === 0}
+            className="p-1 rounded transition-opacity disabled:opacity-30 hover:opacity-70"
+          >
+            <Redo2 className="w-4 h-4" style={{ color: 'var(--color-an-primary)' }} />
+          </button>
         </div>
         <div
           className="h-6 w-px"
           style={{
-            background:
-              'color-mix(in srgb, var(--color-an-outline-variant) 20%, transparent)',
+            background: 'color-mix(in srgb, var(--color-an-outline-variant) 20%, transparent)',
           }}
         />
         <button
@@ -141,8 +154,7 @@ function PlannerBreadcrumb() {
       className="px-6 py-2 flex items-center gap-2 text-xs font-mono uppercase tracking-widest flex-shrink-0"
       style={{
         background: 'var(--color-an-surface-container-low)',
-        color:
-          'color-mix(in srgb, var(--color-an-on-surface-variant) 60%, transparent)',
+        color: 'color-mix(in srgb, var(--color-an-on-surface-variant) 60%, transparent)',
         borderBottom:
           '1px solid color-mix(in srgb, var(--color-an-outline-variant) 5%, transparent)',
       }}
@@ -232,9 +244,6 @@ function LeftSidebar({
 }
 
 // ── Floating Toolbar ─────────────────────────────────────────────────
-type ViewMode = '3d' | 'top' | 'side'
-type RenderMode = 'solid' | 'wire' | 'xray'
-
 function FloatingToolbar({
   viewMode,
   onViewMode,
@@ -253,7 +262,7 @@ function FloatingToolbar({
   ]
 
   const renderOptions: { id: RenderMode; icon: React.ReactNode; label: string }[] = [
-    { id: 'solid', icon: <Grid3x3 className="w-4 h-4" />, label: 'Grid' },
+    { id: 'solid', icon: <Grid3x3 className="w-4 h-4" />, label: 'Solid' },
     { id: 'wire', icon: <Layers className="w-4 h-4" />, label: 'Wire' },
     { id: 'xray', icon: <Eye className="w-4 h-4" />, label: 'X-ray' },
   ]
@@ -328,33 +337,34 @@ function FloatingToolbar({
 
 // ── Canvas HUD ───────────────────────────────────────────────────────
 function CanvasHUD() {
+  const { triggerCameraOp } = useSceneStore()
+
   return (
     <div className="absolute top-6 right-6 flex flex-col gap-2 z-20">
-      {[
-        { icon: <ZoomIn className="w-4 h-4" />, title: 'Zoom in' },
-        { icon: <ZoomOut className="w-4 h-4" />, title: 'Zoom out' },
-      ].map(({ icon, title }) => (
-        <button
-          key={title}
-          type="button"
-          title={title}
-          className="an-glass w-10 h-10 flex items-center justify-center rounded-lg transition-colors hover:opacity-80"
-          style={{
-            border: '1px solid rgba(255,255,255,0.1)',
-            color: 'var(--color-an-on-surface)',
-          }}
-        >
-          {icon}
-        </button>
-      ))}
       <button
         type="button"
-        title="Reset rotation"
+        title="Zoom in"
+        onClick={() => triggerCameraOp('zoom-in')}
+        className="an-glass w-10 h-10 flex items-center justify-center rounded-lg transition-colors hover:opacity-80"
+        style={{ border: '1px solid rgba(255,255,255,0.1)', color: 'var(--color-an-on-surface)' }}
+      >
+        <ZoomIn className="w-4 h-4" />
+      </button>
+      <button
+        type="button"
+        title="Zoom out"
+        onClick={() => triggerCameraOp('zoom-out')}
+        className="an-glass w-10 h-10 flex items-center justify-center rounded-lg transition-colors hover:opacity-80"
+        style={{ border: '1px solid rgba(255,255,255,0.1)', color: 'var(--color-an-on-surface)' }}
+      >
+        <ZoomOut className="w-4 h-4" />
+      </button>
+      <button
+        type="button"
+        title="Reset view"
+        onClick={() => triggerCameraOp('reset')}
         className="an-glass w-10 h-10 flex items-center justify-center rounded-lg transition-colors hover:opacity-80 mt-4"
-        style={{
-          border: '1px solid rgba(255,255,255,0.1)',
-          color: 'var(--color-an-on-surface)',
-        }}
+        style={{ border: '1px solid rgba(255,255,255,0.1)', color: 'var(--color-an-on-surface)' }}
       >
         <RotateCcw className="w-4 h-4" />
       </button>
@@ -363,10 +373,11 @@ function CanvasHUD() {
 }
 
 // ── Page ─────────────────────────────────────────────────────────────
+import { useState } from 'react'
+
 export default function PlannerPage() {
   const [activeTab, setActiveTab] = useState<TabId>('items')
-  const [viewMode, setViewMode] = useState<ViewMode>('3d')
-  const [renderMode, setRenderMode] = useState<RenderMode>('solid')
+  const { viewMode, renderMode, setViewMode, setRenderMode } = useSceneStore()
 
   return (
     <div

@@ -24,12 +24,39 @@ export interface CargoBox {
   category?: string
 }
 
+export type ViewMode = '3d' | 'top' | 'side'
+export type RenderMode = 'solid' | 'wire' | 'xray'
+export type CameraOp = 'zoom-in' | 'zoom-out' | 'reset'
+
 export interface SceneStore {
   containerSize: ContainerSize
   boxes: CargoBox[]
   selectedId: string | null
   gridStep: number
   ghostOpacity: number
+
+  // View / Render
+  viewMode: ViewMode
+  renderMode: RenderMode
+  setViewMode: (v: ViewMode) => void
+  setRenderMode: (r: RenderMode) => void
+
+  // Camera ops (triggered from outside Canvas)
+  cameraOp: CameraOp | null
+  triggerCameraOp: (op: CameraOp) => void
+  clearCameraOp: () => void
+
+  // Unfit items (from auto-pack result)
+  unfitIds: string[]
+  setUnfitIds: (ids: string[]) => void
+
+  // Undo / Redo history
+  history: CargoBox[][]
+  future: CargoBox[][]
+  undo: () => void
+  redo: () => void
+
+  // Box actions
   setContainerSize: (size: ContainerSize) => void
   setSelected: (id: string | null) => void
   moveBox: (id: string, position: THREE.Vector3) => void
@@ -71,33 +98,87 @@ export const useSceneStore = create<SceneStore>((set) => ({
   gridStep: 10,
   ghostOpacity: 0.4,
 
-  setContainerSize: (size) => set({ containerSize: size }),
+  viewMode: '3d',
+  renderMode: 'solid',
+  setViewMode: (viewMode) => set({ viewMode }),
+  setRenderMode: (renderMode) => set({ renderMode }),
 
+  cameraOp: null,
+  triggerCameraOp: (op) => set({ cameraOp: op }),
+  clearCameraOp: () => set({ cameraOp: null }),
+
+  unfitIds: [],
+  setUnfitIds: (ids) => set({ unfitIds: ids }),
+
+  history: [],
+  future: [],
+
+  undo: () =>
+    set((state) => {
+      if (state.history.length === 0) return {}
+      const prev = state.history[state.history.length - 1]
+      return {
+        history: state.history.slice(0, -1),
+        future: [state.boxes, ...state.future].slice(0, 20),
+        boxes: prev,
+        selectedId: prev.some((b) => b.id === state.selectedId) ? state.selectedId : null,
+      }
+    }),
+
+  redo: () =>
+    set((state) => {
+      if (state.future.length === 0) return {}
+      const next = state.future[0]
+      return {
+        future: state.future.slice(1),
+        history: [...state.history, state.boxes].slice(-20),
+        boxes: next,
+        selectedId: next.some((b) => b.id === state.selectedId) ? state.selectedId : null,
+      }
+    }),
+
+  setContainerSize: (size) => set({ containerSize: size }),
   setSelected: (id) => set({ selectedId: id }),
+
+  addBox: (box) =>
+    set((state) => ({
+      history: [...state.history.slice(-19), state.boxes],
+      future: [],
+      boxes: [...state.boxes, box],
+    })),
+
+  removeBox: (id) =>
+    set((state) => ({
+      history: [...state.history.slice(-19), state.boxes],
+      future: [],
+      boxes: state.boxes.filter((b) => b.id !== id),
+      selectedId: state.selectedId === id ? null : state.selectedId,
+    })),
 
   moveBox: (id, position) =>
     set((state) => ({
+      history: [...state.history.slice(-19), state.boxes],
+      future: [],
       boxes: state.boxes.map((b) =>
         b.id === id ? { ...b, position: { x: position.x, y: position.y, z: position.z } } : b
       ),
     })),
 
-  addBox: (box) => set((state) => ({ boxes: [...state.boxes, box] })),
-
-  removeBox: (id) =>
-    set((state) => ({
-      boxes: state.boxes.filter((b) => b.id !== id),
-      selectedId: state.selectedId === id ? null : state.selectedId,
-    })),
-
   setGridStep: (step) => set({ gridStep: step }),
-
   setGhostOpacity: (opacity) => set({ ghostOpacity: opacity }),
 
-  clearBoxes: () => set({ boxes: [], selectedId: null }),
+  clearBoxes: () =>
+    set((state) => ({
+      history: [...state.history.slice(-19), state.boxes],
+      future: [],
+      boxes: [],
+      selectedId: null,
+    })),
 
   moveAllBoxes: (positions) =>
     set((state) => ({
+      history: [...state.history.slice(-19), state.boxes],
+      future: [],
       boxes: state.boxes.map((b) => {
         const found = positions.find((p) => p.id === b.id)
         return found ? { ...b, position: found.position } : b

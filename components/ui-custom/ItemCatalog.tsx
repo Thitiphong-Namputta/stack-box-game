@@ -14,8 +14,9 @@ import type { CargoBox } from '@/store/useSceneStore'
 
 // ── ManifestItemCard ────────────────────────────────────────────────
 function ManifestItemCard({ box }: { box: CargoBox }) {
-  const { selectedId, setSelected, removeBox } = useSceneStore()
+  const { selectedId, setSelected, removeBox, unfitIds } = useSceneStore()
   const isSelected = selectedId === box.id
+  const isUnfit = unfitIds.includes(box.id)
 
   return (
     <div
@@ -48,13 +49,20 @@ function ManifestItemCard({ box }: { box: CargoBox }) {
           </span>
         </div>
         <span
-          className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase flex-shrink-0"
-          style={{
-            background: 'color-mix(in srgb, var(--color-an-tertiary) 10%, transparent)',
-            color: 'var(--color-an-tertiary)',
-          }}
+          className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase shrink-0"
+          style={
+            isUnfit
+              ? {
+                  background: 'color-mix(in srgb, var(--color-an-error) 12%, transparent)',
+                  color: 'var(--color-an-error)',
+                }
+              : {
+                  background: 'color-mix(in srgb, var(--color-an-tertiary) 10%, transparent)',
+                  color: 'var(--color-an-tertiary)',
+                }
+          }
         >
-          Packed
+          {isUnfit ? 'Unfit' : 'Packed'}
         </span>
       </div>
 
@@ -78,6 +86,7 @@ function ManifestItemCard({ box }: { box: CargoBox }) {
       {/* Hover action row */}
       <div className="flex gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
         <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation()
             removeBox(box.id)
@@ -170,6 +179,7 @@ export function ItemsTab() {
         }}
       >
         <button
+          type="button"
           onClick={() => setShowCatalog(true)}
           className="w-full py-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all hover:opacity-80"
           style={{

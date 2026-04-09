@@ -18,7 +18,7 @@ const snapToGrid = (v: number, step: number) => Math.round(v / step) * step
 
 export function CargoBox({ box, onDragStart, onDragEnd }: CargoBoxProps) {
   const { camera, gl } = useThree()
-  const { selectedId, setSelected, moveBox, boxes, containerSize, gridStep, ghostOpacity } =
+  const { selectedId, setSelected, moveBox, boxes, containerSize, gridStep, ghostOpacity, renderMode } =
     useSceneStore()
 
   const isSelected = selectedId === box.id
@@ -123,13 +123,24 @@ export function CargoBox({ box, onDragStart, onDragEnd }: CargoBoxProps) {
         castShadow
       >
         <boxGeometry args={size} />
-        <meshStandardMaterial
-          color={box.color}
-          emissive={isSelected ? '#ffffff' : '#000000'}
-          emissiveIntensity={isSelected ? 0.25 : 0}
-          transparent={showGhost}
-          opacity={showGhost ? 0.25 : 1}
-        />
+        {renderMode === 'wire' ? (
+          <meshStandardMaterial color={box.color} wireframe />
+        ) : renderMode === 'xray' ? (
+          <meshStandardMaterial
+            color={box.color}
+            transparent
+            opacity={0.25}
+            depthWrite={false}
+          />
+        ) : (
+          <meshStandardMaterial
+            color={box.color}
+            emissive={isSelected ? '#ffffff' : '#000000'}
+            emissiveIntensity={isSelected ? 0.25 : 0}
+            transparent={showGhost}
+            opacity={showGhost ? 0.25 : 1}
+          />
+        )}
         {isSelected && (
           <lineSegments>
             <edgesGeometry args={[new THREE.BoxGeometry(...size)]} />

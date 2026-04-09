@@ -1,14 +1,51 @@
 'use client'
 
-import { CheckCircle2, XCircle, Download } from 'lucide-react'
+import { useMemo } from 'react'
+import * as THREE from 'three'
+import { CheckCircle2, XCircle, Download, AlertTriangle } from 'lucide-react'
 import { useSceneStore } from '@/store/useSceneStore'
 import { useBinPacking } from '@/lib/packing/useBinPacking'
+import type { CargoBox } from '@/store/useSceneStore'
 
-const CONSTRAINTS = [
-  { label: 'Stackability limits', pass: true },
-  { label: 'Weight distribution', pass: true },
-  { label: 'Fragility orientation', pass: false },
-]
+// ── helpers ─────────────────────────────────────────────────────────
+
+function hasAnyCollision(boxes: CargoBox[]): boolean {
+  const EPS = 0.5
+  for (let i = 0; i < boxes.length; i++) {
+    for (let j = i + 1; j < boxes.length; j++) {
+      const a = boxes[i]
+      const b = boxes[j]
+      const aBox = new THREE.Box3(
+        new THREE.Vector3(
+          a.position.x - a.size.w / 2 + EPS,
+          a.position.y - a.size.h / 2 + EPS,
+          a.position.z - a.size.d / 2 + EPS
+        ),
+        new THREE.Vector3(
+          a.position.x + a.size.w / 2 - EPS,
+          a.position.y + a.size.h / 2 - EPS,
+          a.position.z + a.size.d / 2 - EPS
+        )
+      )
+      const bBox = new THREE.Box3(
+        new THREE.Vector3(
+          b.position.x - b.size.w / 2 + EPS,
+          b.position.y - b.size.h / 2 + EPS,
+          b.position.z - b.size.d / 2 + EPS
+        ),
+        new THREE.Vector3(
+          b.position.x + b.size.w / 2 - EPS,
+          b.position.y + b.size.h / 2 - EPS,
+          b.position.z + b.size.d / 2 - EPS
+        )
+      )
+      if (aBox.intersectsBox(bBox)) return true
+    }
+  }
+  return false
+}
+
+// ── sub-components ───────────────────────────────────────────────────
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -58,8 +95,10 @@ function UtilizationBar({
   )
 }
 
+// ── RightPanel ───────────────────────────────────────────────────────
+
 export function RightPanel() {
-  const { boxes, selectedId, containerSize } = useSceneStore()
+  const { boxes, selectedId, containerSize, unfitIds } = useSceneStore()
   const { spaceUtilization } = useBinPacking()
   const selected = boxes.find((b) => b.id === selectedId)
 
@@ -67,6 +106,40 @@ export function RightPanel() {
   const weightUtilization = containerSize.maxWeight
     ? Math.round((totalWeight / containerSize.maxWeight) * 100)
     : 0
+
+  // Real constraint analysis
+  const constraints = useMemo(() => {
+    const weightOk = totalWeight <= (containerSize.maxWeight ?? Infinity)
+    const volumeOk = spaceUtilization <= 100
+    const noCollision = boxes.length < 2 || !hasAnyCollision(boxes)
+    return [
+      { label: 'Weight limit', pass: weightOk },
+      { label: 'Volume capacity', pass: volumeOk },
+      { label: 'No collisions', pass: noCollision },
+    ]
+  }, [boxes, totalWeight, containerSize.maxWeight, spaceUtilization])
+
+  const handleExport = () => {
+    const data = {
+      exportedAt: new Date().toISOString(),
+      containerSize,
+      boxes: boxes.map((b) => ({
+        id: b.id,
+        name: b.name,
+        size: b.size,
+        weight: b.weight,
+        position: b.position,
+        category: b.category,
+      })),
+    }
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `cargo-plan-${Date.now()}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   return (
     <aside
@@ -94,11 +167,46 @@ export function RightPanel() {
           <UtilizationBar
             label="Weight Capacity"
             value={weightUtilization}
-            valueColor="var(--color-an-on-surface)"
-            gradient="var(--color-an-primary)"
+            valueColor={weightUtilization > 100 ? 'var(--color-an-error)' : 'var(--color-an-on-surface)'}
+            gradient={weightUtilization > 100 ? 'var(--color-an-error)' : 'var(--color-an-primary)'}
           />
         </div>
       </section>
+
+      {/* Unfit items warning */}
+      {unfitIds.length > 0 && (
+        <section
+          className="px-6 py-4 flex-shrink-0"
+          style={{
+            borderBottom: '1px solid color-mix(in srgb, var(--color-an-outline-variant) 5%, transparent)',
+            background: 'color-mix(in srgb, var(--color-an-error) 8%, transparent)',
+          }}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--color-an-error)' }} />
+            <span className="text-xs font-bold" style={{ color: 'var(--color-an-error)' }}>
+              {unfitIds.length} item{unfitIds.length > 1 ? 's' : ''} could not be packed
+            </span>
+          </div>
+          <div className="space-y-1">
+            {unfitIds.map((id) => {
+              const box = boxes.find((b) => b.id === id)
+              return box ? (
+                <div
+                  key={id}
+                  className="text-[11px] font-mono px-2 py-0.5 rounded"
+                  style={{
+                    color: 'var(--color-an-error)',
+                    background: 'color-mix(in srgb, var(--color-an-error) 10%, transparent)',
+                  }}
+                >
+                  {box.name} ({box.size.w}×{box.size.h}×{box.size.d})
+                </div>
+              ) : null
+            })}
+          </div>
+        </section>
+      )}
 
       {/* Constraint Analysis */}
       <section
@@ -109,7 +217,7 @@ export function RightPanel() {
       >
         <SectionLabel>Constraint Analysis</SectionLabel>
         <div className="space-y-3 mt-4">
-          {CONSTRAINTS.map(({ label, pass }) => (
+          {constraints.map(({ label, pass }) => (
             <div
               key={label}
               className="flex items-center justify-between p-2 rounded-lg"
@@ -223,7 +331,7 @@ export function RightPanel() {
           </div>
         )}
 
-        {/* Export + Share */}
+        {/* Export */}
         <div
           className="mt-6 pt-6"
           style={{
@@ -232,7 +340,10 @@ export function RightPanel() {
           }}
         >
           <button
-            className="w-full py-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all hover:opacity-80"
+            type="button"
+            onClick={handleExport}
+            disabled={boxes.length === 0}
+            className="w-full py-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all hover:opacity-80 disabled:opacity-30"
             style={{
               background: 'rgba(255,255,255,0.05)',
               color: 'var(--color-an-on-surface)',
@@ -242,14 +353,6 @@ export function RightPanel() {
           >
             <Download className="w-3.5 h-3.5" />
             Export Plan (.JSON)
-          </button>
-          <button
-            className="w-full mt-2 py-2 text-xs font-medium transition-all hover:opacity-100"
-            style={{
-              color: 'color-mix(in srgb, var(--color-an-primary) 60%, transparent)',
-            }}
-          >
-            Share Link
           </button>
         </div>
       </section>
