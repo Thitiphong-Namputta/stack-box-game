@@ -1,29 +1,37 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Box, FileBox, Clock, Package } from "lucide-react";
+import { Box, FileBox, Clock, Package, Trash2 } from "lucide-react";
 import { ModeToggle } from "@/components/mode-toggle";
-
-const mockPlans = [
-  { id: "2041", name: "Shipment #2041", date: "2026-04-08", boxes: 12, utilization: 78 },
-  { id: "2040", name: "Shipment #2040", date: "2026-04-05", boxes: 8,  utilization: 61 },
-  { id: "2039", name: "Shipment #2039", date: "2026-04-01", boxes: 20, utilization: 94 },
-];
+import {
+  getSavedPlans,
+  deleteSavedPlan,
+} from "@/store/useSceneStore";
+import type { SavedPlan } from "@/store/useSceneStore";
 
 const navItems = [
-  { label: "Dashboard",  href: "/" },
+  { label: "Dashboard", href: "/" },
   { label: "3D Planner", href: "/planner" },
   { label: "Load Plans", href: "/load-plans" },
-  { label: "Catalog",    href: "/catalog" },
+  { label: "Catalog", href: "/catalog" },
 ];
 
 export default function LoadPlansPage() {
   const pathname = usePathname();
+  const [plans, setPlans] = useState<SavedPlan[]>(() => getSavedPlans());
+
+  const handleDelete = (e: React.MouseEvent, id: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    deleteSavedPlan(id);
+    setPlans(getSavedPlans());
+  };
 
   return (
     <div className="min-h-screen flex flex-col an-bg-surface an-text-on-surface">
-      {/* Header — matches PlannerHeader layout */}
+      {/* Header */}
       <header className="h-16 flex items-center justify-between px-6 z-50 shrink-0 an-bg-surface border-b border-(--an-divider-color)">
         <div className="flex items-center gap-8">
           <Link href="/" className="flex items-center gap-2">
@@ -37,7 +45,9 @@ export default function LoadPlansPage() {
               <Link
                 key={href}
                 href={href}
-                className={`text-sm transition-colors duration-200 ${pathname === href ? "an-nav-active" : "an-nav-inactive"}`}
+                className={`text-sm transition-colors duration-200 ${
+                  pathname === href ? "an-nav-active" : "an-nav-inactive"
+                }`}
               >
                 {label}
               </Link>
@@ -56,45 +66,78 @@ export default function LoadPlansPage() {
           </p>
         </div>
 
-        {mockPlans.length === 0 ? (
+        {plans.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 an-text-on-surface-muted">
             <FileBox className="w-12 h-12 mb-4 opacity-40" />
             <p className="text-sm">ยังไม่มี plan ที่บันทึกไว้</p>
+            <Link
+              href="/planner"
+              className="mt-4 text-sm an-text-primary hover:opacity-70 transition-opacity"
+            >
+              → ไปที่ 3D Planner
+            </Link>
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            {mockPlans.map((plan) => (
-              <Link
-                key={plan.id}
-                href={`/planner?plan=${plan.id}`}
-                className="flex items-center justify-between p-5 rounded-xl an-bg-surface-container hover:an-bg-surface-variant border border-an-outline-variant border-opacity-10 transition-all group"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-lg flex items-center justify-center an-bg-surface-low">
-                    <FileBox className="w-5 h-5 an-text-primary" />
-                  </div>
-                  <div>
-                    <p className="font-semibold an-text-on-surface group-hover:an-text-primary transition-colors">
-                      {plan.name}
-                    </p>
-                    <div className="flex items-center gap-3 text-xs mt-0.5 an-text-on-surface-muted">
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {plan.date}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Package className="w-3 h-3" />
-                        {plan.boxes} กล่อง
-                      </span>
+            {plans.map((plan) => {
+              const vol = plan.boxes.reduce(
+                (s, b) => s + b.size.w * b.size.h * b.size.d,
+                0
+              );
+              const total =
+                plan.containerSize.w *
+                plan.containerSize.h *
+                plan.containerSize.d;
+              const util = total > 0 ? Math.round((vol / total) * 100) : 0;
+
+              return (
+                <div key={plan.id} className="relative group">
+                  <Link
+                    href={`/planner?plan=${plan.id}`}
+                    className="flex items-center justify-between p-5 rounded-xl an-bg-surface-container hover:an-bg-surface-variant border border-an-outline-variant border-opacity-10 transition-all"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center an-bg-surface-low">
+                        <FileBox className="w-5 h-5 an-text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-semibold an-text-on-surface group-hover:an-text-primary transition-colors">
+                          {plan.name}
+                        </p>
+                        <div className="flex items-center gap-3 text-xs mt-0.5 an-text-on-surface-muted">
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {new Date(plan.savedAt).toLocaleDateString("th-TH", {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                            })}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Package className="w-3 h-3" />
+                            {plan.boxes.length} กล่อง
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                    <div className="text-right pr-10">
+                      <p className="text-sm font-bold an-text-primary">{util}%</p>
+                      <p className="text-xs an-text-on-surface-muted">การใช้พื้นที่</p>
+                    </div>
+                  </Link>
+
+                  {/* Delete button — overlaid, not inside the Link */}
+                  <button
+                    type="button"
+                    onClick={(e) => handleDelete(e, plan.id)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:opacity-70"
+                    title="ลบ plan นี้"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold an-text-primary">{plan.utilization}%</p>
-                  <p className="text-xs an-text-on-surface-muted">การใช้พื้นที่</p>
-                </div>
-              </Link>
-            ))}
+              );
+            })}
           </div>
         )}
       </main>

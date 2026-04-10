@@ -4,7 +4,7 @@ import { useRef, useState, useCallback } from 'react'
 import * as THREE from 'three'
 import { useThree, ThreeEvent } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
-import { useSceneStore } from '@/store/useSceneStore'
+import { useSceneStore, getEffectiveSize } from '@/store/useSceneStore'
 import { validatePlacement, getSupportY } from '@/lib/packing/packingUtils'
 import type { CargoBox as CargoBoxType } from '@/store/useSceneStore'
 
@@ -18,10 +18,20 @@ const snapToGrid = (v: number, step: number) => Math.round(v / step) * step
 
 export function CargoBox({ box, onDragStart, onDragEnd }: CargoBoxProps) {
   const { camera, gl } = useThree()
-  const { selectedId, setSelected, moveBox, boxes, containerSize, gridStep, ghostOpacity, renderMode } =
-    useSceneStore()
+  const {
+    selectedId,
+    setSelected,
+    moveBox,
+    boxes,
+    containerSize,
+    gridStep,
+    ghostOpacity,
+    renderMode,
+    flashId,
+  } = useSceneStore()
 
   const isSelected = selectedId === box.id
+  const isFlashing = flashId === box.id
 
   const isDraggingRef = useRef(false)
   const ghostPosRef = useRef<THREE.Vector3 | null>(null)
@@ -50,6 +60,8 @@ export function CargoBox({ box, onDragStart, onDragEnd }: CargoBoxProps) {
       e.stopPropagation()
       setSelected(box.id)
 
+      const effectiveSize = getEffectiveSize(box)
+
       // Floor-level plane to get X,Z from mouse — Y computed separately via getSupportY
       const dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
       const raycaster = new THREE.Raycaster()
@@ -67,14 +79,14 @@ export function CargoBox({ box, onDragStart, onDragEnd }: CargoBoxProps) {
         const intersection = new THREE.Vector3()
         if (!raycaster.ray.intersectPlane(dragPlane, intersection)) return
 
-        // Snap X,Z to grid and clamp inside container
+        // Snap X,Z to grid and clamp inside container using effective size
         const clampedX = Math.max(
-          box.size.w / 2,
-          Math.min(containerSize.w - box.size.w / 2, snapToGrid(intersection.x, gridStep))
+          effectiveSize.w / 2,
+          Math.min(containerSize.w - effectiveSize.w / 2, snapToGrid(intersection.x, gridStep))
         )
         const clampedZ = Math.max(
-          box.size.d / 2,
-          Math.min(containerSize.d - box.size.d / 2, snapToGrid(intersection.z, gridStep))
+          effectiveSize.d / 2,
+          Math.min(containerSize.d - effectiveSize.d / 2, snapToGrid(intersection.z, gridStep))
         )
 
         // Auto-gravity: compute Y from support surface at (clampedX, clampedZ)
@@ -106,12 +118,17 @@ export function CargoBox({ box, onDragStart, onDragEnd }: CargoBoxProps) {
       document.addEventListener('pointermove', onPointerMove)
       document.addEventListener('pointerup', onPointerUp)
     },
-     
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [box, boxes, camera, containerSize, gridStep, moveBox, setSelected, getMouseNDC, onDragStart, onDragEnd]
   )
 
+  const effectiveSize = getEffectiveSize(box)
   const position: [number, number, number] = [box.position.x, box.position.y, box.position.z]
-  const size: [number, number, number] = [box.size.w, box.size.h, box.size.d]
+  const size: [number, number, number] = [effectiveSize.w, effectiveSize.h, effectiveSize.d]
+
+  // Outline color: red flash > selected white > none
+  const outlineColor = isFlashing ? '#ef4444' : '#ffffff'
+  const showOutline = isSelected || isFlashing
 
   return (
     <>
@@ -141,18 +158,21 @@ export function CargoBox({ box, onDragStart, onDragEnd }: CargoBoxProps) {
             opacity={showGhost ? 0.25 : 1}
           />
         )}
-        {isSelected && (
+
+        {showOutline && (
           <lineSegments>
             <edgesGeometry args={[new THREE.BoxGeometry(...size)]} />
-            <lineBasicMaterial color="#ffffff" linewidth={2} />
+            <lineBasicMaterial color={outlineColor} linewidth={2} />
           </lineSegments>
         )}
 
         {showTooltip && !showGhost && (
-          <Html distanceFactor={300} position={[0, box.size.h / 2 + 10, 0]} center>
+          <Html distanceFactor={300} position={[0, effectiveSize.h / 2 + 10, 0]} center>
             <div className="bg-slate-900 text-white text-xs px-2 py-1 rounded shadow-lg pointer-events-none whitespace-nowrap">
               <div className="font-semibold">{box.name}</div>
-              <div className="text-slate-300">{box.size.w}×{box.size.h}×{box.size.d} cm</div>
+              <div className="text-slate-300">
+                {effectiveSize.w}×{effectiveSize.h}×{effectiveSize.d} cm
+              </div>
               <div className="text-slate-400">{box.weight} kg</div>
             </div>
           </Html>

@@ -8,9 +8,9 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
-import { useSceneStore, SAMPLE_CATALOG, getNextColor } from '@/store/useSceneStore'
+import { useSceneStore, getNextColor } from '@/store/useSceneStore'
 import { useBinPacking } from '@/lib/packing/useBinPacking'
-import type { CargoBox } from '@/store/useSceneStore'
+import type { CargoBox, CatalogItem } from '@/store/useSceneStore'
 
 // ── ManifestItemCard ────────────────────────────────────────────────
 function ManifestItemCard({ box }: { box: CargoBox }) {
@@ -77,18 +77,18 @@ function ManifestItemCard({ box }: { box: CargoBox }) {
 
 // ── ItemsTab ────────────────────────────────────────────────────────
 export function ItemsTab() {
-  const { addBox, boxes } = useSceneStore()
+  const { addBox, boxes, catalog } = useSceneStore()
   const { getSuggestedPosition } = useBinPacking()
   const [showCatalog, setShowCatalog] = useState(false)
   const [search, setSearch] = useState('')
 
-  const filtered = SAMPLE_CATALOG.filter(
+  const filtered = catalog.filter(
     (item) =>
       item.name.toLowerCase().includes(search.toLowerCase()) ||
       item.category?.toLowerCase().includes(search.toLowerCase())
   )
 
-  const handleAdd = (template: (typeof SAMPLE_CATALOG)[number]) => {
+  const handleAdd = (template: CatalogItem) => {
     const id = nanoid()
     const color = getNextColor()
 
@@ -110,7 +110,7 @@ export function ItemsTab() {
     addBox(newBox)
   }
 
-  const categories = [...new Set(SAMPLE_CATALOG.map((i) => i.category).filter(Boolean))]
+  const categories = [...new Set(catalog.map((i) => i.category).filter(Boolean))]
 
   return (
     <div className="flex flex-col h-full">
@@ -174,7 +174,7 @@ export function ItemsTab() {
                   </div>
                   {items.map((item) => (
                     <div
-                      key={item.name}
+                      key={item.id}
                       className="flex items-center justify-between p-3 rounded-lg mb-1 group transition-colors an-catalog-item"
                       onClick={() => handleAdd(item)}
                     >
@@ -200,6 +200,11 @@ export function ItemsTab() {
                 </div>
               )
             })}
+            {filtered.length === 0 && (
+              <div className="text-xs text-center an-text-on-surface-muted opacity-60 py-8">
+                No items found
+              </div>
+            )}
           </ScrollArea>
 
           <div className="mt-2 text-xs text-center an-text-on-surface-muted opacity-60">

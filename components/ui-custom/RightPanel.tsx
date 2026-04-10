@@ -2,9 +2,10 @@
 
 import { useMemo } from 'react'
 import * as THREE from 'three'
-import { CheckCircle2, XCircle, Download, AlertTriangle } from 'lucide-react'
-import { useSceneStore } from '@/store/useSceneStore'
+import { CheckCircle2, XCircle, Download, AlertTriangle, RotateCcw, RotateCw } from 'lucide-react'
+import { useSceneStore, getEffectiveSize } from '@/store/useSceneStore'
 import { useBinPacking } from '@/lib/packing/useBinPacking'
+import { validatePlacement } from '@/lib/packing/packingUtils'
 import type { CargoBox } from '@/store/useSceneStore'
 
 // ── helpers ─────────────────────────────────────────────────────────
@@ -15,34 +16,46 @@ function hasAnyCollision(boxes: CargoBox[]): boolean {
     for (let j = i + 1; j < boxes.length; j++) {
       const a = boxes[i]
       const b = boxes[j]
+      const as_ = getEffectiveSize(a)
+      const bs_ = getEffectiveSize(b)
       const aBox = new THREE.Box3(
         new THREE.Vector3(
-          a.position.x - a.size.w / 2 + EPS,
-          a.position.y - a.size.h / 2 + EPS,
-          a.position.z - a.size.d / 2 + EPS
+          a.position.x - as_.w / 2 + EPS,
+          a.position.y - as_.h / 2 + EPS,
+          a.position.z - as_.d / 2 + EPS
         ),
         new THREE.Vector3(
-          a.position.x + a.size.w / 2 - EPS,
-          a.position.y + a.size.h / 2 - EPS,
-          a.position.z + a.size.d / 2 - EPS
+          a.position.x + as_.w / 2 - EPS,
+          a.position.y + as_.h / 2 - EPS,
+          a.position.z + as_.d / 2 - EPS
         )
       )
       const bBox = new THREE.Box3(
         new THREE.Vector3(
-          b.position.x - b.size.w / 2 + EPS,
-          b.position.y - b.size.h / 2 + EPS,
-          b.position.z - b.size.d / 2 + EPS
+          b.position.x - bs_.w / 2 + EPS,
+          b.position.y - bs_.h / 2 + EPS,
+          b.position.z - bs_.d / 2 + EPS
         ),
         new THREE.Vector3(
-          b.position.x + b.size.w / 2 - EPS,
-          b.position.y + b.size.h / 2 - EPS,
-          b.position.z + b.size.d / 2 - EPS
+          b.position.x + bs_.w / 2 - EPS,
+          b.position.y + bs_.h / 2 - EPS,
+          b.position.z + bs_.d / 2 - EPS
         )
       )
       if (aBox.intersectsBox(bBox)) return true
     }
   }
   return false
+}
+
+// Orientation labels for display
+const ORIENTATION_LABELS: Record<number, string> = {
+  0: 'Default',
+  1: 'Y 90°',
+  2: 'On Side',
+  3: 'On Side+',
+  4: 'Upright',
+  5: 'Upright+',
 }
 
 // ── sub-components ───────────────────────────────────────────────────
@@ -92,7 +105,7 @@ function UtilizationBar({
 // ── RightPanel ───────────────────────────────────────────────────────
 
 export function RightPanel() {
-  const { boxes, selectedId, containerSize, unfitIds } = useSceneStore()
+  const { boxes, selectedId, containerSize, unfitIds, rotateBox, setFlashId } = useSceneStore()
   const { spaceUtilization } = useBinPacking()
   const selected = boxes.find((b) => b.id === selectedId)
 
@@ -120,6 +133,7 @@ export function RightPanel() {
         id: b.id,
         name: b.name,
         size: b.size,
+        orientationId: b.orientationId ?? 0,
         weight: b.weight,
         position: b.position,
         category: b.category,
@@ -132,6 +146,24 @@ export function RightPanel() {
     a.download = `cargo-plan-${Date.now()}.json`
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  // Effective size of selected box (accounts for orientation)
+  const selectedEffective = selected ? getEffectiveSize(selected) : null
+
+  const handleRotate = (dir: 'fwd' | 'bwd') => {
+    if (!selected) return
+    const current = selected.orientationId ?? 0
+    const next = (dir === 'fwd' ? current + 1 : current + 5) % 6
+    const rotated = { ...selected, orientationId: next as 0 | 1 | 2 | 3 | 4 | 5 }
+    const pos = new THREE.Vector3(selected.position.x, selected.position.y, selected.position.z)
+    const result = validatePlacement(rotated, pos, boxes, containerSize)
+    if (result.valid) {
+      rotateBox(selected.id, dir)
+    } else {
+      setFlashId(selected.id)
+      setTimeout(() => setFlashId(null), 500)
+    }
   }
 
   return (
@@ -208,13 +240,14 @@ export function RightPanel() {
           {selected ? `Selection: ${selected.name}` : 'Selection'}
         </SectionLabel>
 
-        {selected ? (
+        {selected && selectedEffective ? (
           <>
+            {/* Dimensions (effective — after orientation) */}
             <div className="grid grid-cols-2 gap-4 mt-4">
               {[
-                { label: 'Length', value: `${selected.size.w}.0 cm` },
-                { label: 'Width', value: `${selected.size.d}.0 cm` },
-                { label: 'Height', value: `${selected.size.h}.0 cm` },
+                { label: 'Length', value: `${selectedEffective.w} cm` },
+                { label: 'Width',  value: `${selectedEffective.d} cm` },
+                { label: 'Height', value: `${selectedEffective.h} cm` },
                 { label: 'Weight', value: `${selected.weight} kg` },
               ].map(({ label, value }) => (
                 <div key={label} className="p-3 rounded-lg an-stat-card">
@@ -233,6 +266,43 @@ export function RightPanel() {
                 ).toFixed(3)}{' '}
                 m³
               </div>
+            </div>
+
+            {/* Rotation controls */}
+            <div className="mt-4 p-3 rounded-lg an-stat-card">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-[10px] uppercase an-stat-label">Orientation</div>
+                <span className="text-[10px] font-mono an-text-on-surface-muted">
+                  {ORIENTATION_LABELS[selected.orientationId ?? 0]}
+                  {' '}({selected.orientationId ?? 0}/5)
+                </span>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleRotate('bwd')}
+                  title="Rotate backward (Shift+R)"
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold transition-opacity hover:opacity-70 an-btn-outline-primary"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  Shift+R
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleRotate('fwd')}
+                  title="Rotate forward (R)"
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold transition-opacity hover:opacity-70 an-btn-outline-primary"
+                >
+                  <RotateCw className="w-3.5 h-3.5" />
+                  R
+                </button>
+              </div>
+              {/* Original size hint if orientation changes it */}
+              {(selected.orientationId ?? 0) !== 0 && (
+                <div className="mt-2 text-[9px] an-text-on-surface-muted opacity-60 text-center">
+                  original: {selected.size.w}×{selected.size.h}×{selected.size.d} cm
+                </div>
+              )}
             </div>
           </>
         ) : (

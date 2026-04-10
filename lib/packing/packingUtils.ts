@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { getEffectiveSize } from '@/store/useSceneStore'
 import type { CargoBox, ContainerSize } from '@/store/useSceneStore'
 
 // binpackingjs has no type declarations — use require
@@ -10,7 +11,8 @@ const { Item, Bin, Packer } = BP3D
 const SCALE = 1e5
 
 export function toPackingItem(box: CargoBox) {
-  return new Item(box.id, box.size.w, box.size.h, box.size.d, box.weight ?? 0)
+  const s = getEffectiveSize(box)
+  return new Item(box.id, s.w, s.h, s.d, box.weight ?? 0)
 }
 
 export function toPackingBin(size: ContainerSize) {
@@ -49,21 +51,23 @@ export function getSupportY(
   placedBoxes: CargoBox[],
   containerSize: ContainerSize
 ): number {
+  const ns = getEffectiveSize(newBox)
   let supportTop = 0
   for (const other of placedBoxes) {
     if (other.id === newBox.id) continue
+    const os = getEffectiveSize(other)
     if (
       footprintOverlaps(
-        x, newBox.size.w, z, newBox.size.d,
-        other.position.x, other.size.w, other.position.z, other.size.d
+        x, ns.w, z, ns.d,
+        other.position.x, os.w, other.position.z, os.d
       )
     ) {
-      const top = other.position.y + other.size.h / 2
+      const top = other.position.y + os.h / 2
       if (top > supportTop) supportTop = top
     }
   }
-  const y = supportTop + newBox.size.h / 2
-  return Math.min(y, containerSize.h - newBox.size.h / 2)
+  const y = supportTop + ns.h / 2
+  return Math.min(y, containerSize.h - ns.h / 2)
 }
 
 /**
@@ -75,15 +79,14 @@ export function suggestPosition(
   placedBoxes: CargoBox[],
   containerSize: ContainerSize
 ): THREE.Vector3 | null {
-  // Scan step = half of the box dimension for reasonable coverage
-  const stepX = Math.max(newBox.size.w / 2, 1)
-  const stepZ = Math.max(newBox.size.d / 2, 1)
+  const ns = getEffectiveSize(newBox)
+  const stepX = Math.max(ns.w / 2, 1)
+  const stepZ = Math.max(ns.d / 2, 1)
 
-  for (let z = newBox.size.d / 2; z <= containerSize.d - newBox.size.d / 2; z += stepZ) {
-    for (let x = newBox.size.w / 2; x <= containerSize.w - newBox.size.w / 2; x += stepX) {
+  for (let z = ns.d / 2; z <= containerSize.d - ns.d / 2; z += stepZ) {
+    for (let x = ns.w / 2; x <= containerSize.w - ns.w / 2; x += stepX) {
       const y = getSupportY(x, z, newBox, placedBoxes, containerSize)
-      // Skip if box would exceed container height
-      if (y + newBox.size.h / 2 > containerSize.h) continue
+      if (y + ns.h / 2 > containerSize.h) continue
 
       const candidate = new THREE.Vector3(x, y, z)
       const result = validatePlacement(newBox, candidate, placedBoxes, containerSize)
@@ -99,14 +102,16 @@ export function validatePlacement(
   otherBoxes: CargoBox[],
   containerSize: ContainerSize
 ): { valid: boolean; reason?: string } {
+  const ms = getEffectiveSize(movingBox)
+
   // Boundary check (position = center of box)
   if (
-    newPos.x - movingBox.size.w / 2 < 0 ||
-    newPos.x + movingBox.size.w / 2 > containerSize.w ||
-    newPos.y - movingBox.size.h / 2 < 0 ||
-    newPos.y + movingBox.size.h / 2 > containerSize.h ||
-    newPos.z - movingBox.size.d / 2 < 0 ||
-    newPos.z + movingBox.size.d / 2 > containerSize.d
+    newPos.x - ms.w / 2 < 0 ||
+    newPos.x + ms.w / 2 > containerSize.w ||
+    newPos.y - ms.h / 2 < 0 ||
+    newPos.y + ms.h / 2 > containerSize.h ||
+    newPos.z - ms.d / 2 < 0 ||
+    newPos.z + ms.d / 2 > containerSize.d
   ) {
     return { valid: false, reason: 'กล่องเกินขอบตู้' }
   }
@@ -115,22 +120,23 @@ export function validatePlacement(
   const EPS = 0.1
   const aNew = new THREE.Box3(
     new THREE.Vector3(
-      newPos.x - movingBox.size.w / 2 + EPS,
-      newPos.y - movingBox.size.h / 2 + EPS,
-      newPos.z - movingBox.size.d / 2 + EPS
+      newPos.x - ms.w / 2 + EPS,
+      newPos.y - ms.h / 2 + EPS,
+      newPos.z - ms.d / 2 + EPS
     ),
     new THREE.Vector3(
-      newPos.x + movingBox.size.w / 2 - EPS,
-      newPos.y + movingBox.size.h / 2 - EPS,
-      newPos.z + movingBox.size.d / 2 - EPS
+      newPos.x + ms.w / 2 - EPS,
+      newPos.y + ms.h / 2 - EPS,
+      newPos.z + ms.d / 2 - EPS
     )
   )
 
   for (const other of otherBoxes) {
     if (other.id === movingBox.id) continue
+    const os = getEffectiveSize(other)
     const aOther = new THREE.Box3().setFromCenterAndSize(
       new THREE.Vector3(other.position.x, other.position.y, other.position.z),
-      new THREE.Vector3(other.size.w, other.size.h, other.size.d)
+      new THREE.Vector3(os.w, os.h, os.d)
     )
     if (aNew.intersectsBox(aOther)) {
       return { valid: false, reason: `ชนกับ ${other.name}` }

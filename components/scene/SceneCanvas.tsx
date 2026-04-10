@@ -4,13 +4,13 @@ import { useRef, useState, useCallback, useEffect } from 'react'
 import * as THREE from 'three'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Grid } from '@react-three/drei'
-import { useSceneStore } from '@/store/useSceneStore'
+import { useSceneStore, getEffectiveSize } from '@/store/useSceneStore'
+import { validatePlacement } from '@/lib/packing/packingUtils'
 import { CargoContainer } from './CargoContainer'
 import { CargoBox } from './CargoBox'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 
 // ── CameraController ───────────────────────────────────────────────────
-// Runs inside Canvas to imperatively control the camera based on store state.
 function CameraController({
   orbitRef,
 }: {
@@ -65,18 +65,94 @@ function CameraController({
 
 // ── SceneCanvas ────────────────────────────────────────────────────────
 export function SceneCanvas() {
-  const { boxes, containerSize, setSelected } = useSceneStore()
+  const {
+    boxes,
+    containerSize,
+    gridStep,
+    selectedId,
+    setSelected,
+    moveBox,
+    removeBox,
+    rotateBox,
+    undo,
+    redo,
+    setFlashId,
+  } = useSceneStore()
   const orbitRef = useRef<OrbitControlsImpl>(null)
   const [isDragging, setIsDragging] = useState(false)
 
-  // Escape key → deselect
+  // Keyboard shortcuts
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setSelected(null)
+      // Don't intercept when typing in an input/textarea
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+
+      const isMod = e.ctrlKey || e.metaKey
+
+      // Undo / Redo
+      if (isMod && !e.shiftKey && e.key === 'z') { e.preventDefault(); undo(); return }
+      if (isMod && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) { e.preventDefault(); redo(); return }
+
+      // Escape — deselect
+      if (e.key === 'Escape') { setSelected(null); return }
+
+      // Everything below requires a selected box
+      const box = selectedId ? boxes.find((b) => b.id === selectedId) : null
+      if (!box) return
+
+      // Delete — remove selected box
+      if (e.key === 'Delete') {
+        e.preventDefault()
+        removeBox(box.id)
+        return
+      }
+
+      // R — rotate selected box
+      if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault()
+        const dir = e.shiftKey ? 'bwd' : 'fwd'
+        const current = box.orientationId ?? 0
+        const next = (dir === 'fwd' ? current + 1 : current + 5) % 6
+        const rotated = { ...box, orientationId: next as 0 | 1 | 2 | 3 | 4 | 5 }
+        const pos = new THREE.Vector3(box.position.x, box.position.y, box.position.z)
+        const result = validatePlacement(rotated, pos, boxes, containerSize)
+        if (result.valid) {
+          rotateBox(box.id, dir)
+        } else {
+          setFlashId(box.id)
+          setTimeout(() => setFlashId(null), 500)
+        }
+        return
+      }
+
+      // Arrow keys + PageUp/PageDown — move 1 gridStep
+      const MOVE_MAP: Record<string, { axis: 'x' | 'y' | 'z'; dir: 1 | -1 }> = {
+        ArrowLeft:  { axis: 'x', dir: -1 },
+        ArrowRight: { axis: 'x', dir:  1 },
+        ArrowUp:    { axis: 'z', dir: -1 },
+        ArrowDown:  { axis: 'z', dir:  1 },
+        PageUp:     { axis: 'y', dir:  1 },
+        PageDown:   { axis: 'y', dir: -1 },
+      }
+      const move = MOVE_MAP[e.key]
+      if (move) {
+        e.preventDefault()
+        const newPos = new THREE.Vector3(box.position.x, box.position.y, box.position.z)
+        newPos[move.axis] += move.dir * gridStep
+        const result = validatePlacement(box, newPos, boxes, containerSize)
+        if (result.valid) {
+          moveBox(box.id, newPos)
+        } else {
+          setFlashId(box.id)
+          setTimeout(() => setFlashId(null), 500)
+        }
+      }
     }
+
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [setSelected])
+  }, [boxes, containerSize, gridStep, selectedId, setSelected, moveBox, removeBox, rotateBox, undo, redo, setFlashId])
 
   const handleDragStart = useCallback(() => {
     setIsDragging(true)

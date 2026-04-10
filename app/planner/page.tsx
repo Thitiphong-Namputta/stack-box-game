@@ -1,8 +1,10 @@
 "use client";
 
+import { Suspense, useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams, useRouter } from "next/navigation";
+import { nanoid } from "nanoid";
 import {
   Zap,
   Undo2,
@@ -17,13 +19,26 @@ import {
   Box,
   ArrowDown,
   ArrowRight,
+  Save,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { ItemsTab } from "@/components/ui-custom/ItemCatalog";
 import { ContainerTab } from "@/components/ui-custom/ControlPanel";
 import { RightPanel } from "@/components/ui-custom/RightPanel";
-import { useSceneStore } from "@/store/useSceneStore";
+import {
+  useSceneStore,
+  getSavedPlans,
+  savePlanToStorage,
+} from "@/store/useSceneStore";
 import { useBinPacking } from "@/lib/packing/useBinPacking";
-import type { ViewMode, RenderMode } from "@/store/useSceneStore";
+import type { ViewMode, RenderMode, StepAction, SavedPlan } from "@/store/useSceneStore";
 import { ModeToggle } from "@/components/mode-toggle";
 
 const SceneCanvas = dynamic(
@@ -38,18 +53,70 @@ const SceneCanvas = dynamic(
   },
 );
 
+// ── PlannerLoader — reads ?plan= param and loads into store ──────────
+function PlannerLoader() {
+  const searchParams = useSearchParams();
+  const { loadPlan, setActivePlan } = useSceneStore();
+
+  useEffect(() => {
+    const planId = searchParams.get("plan");
+    if (!planId) return;
+    const found = getSavedPlans().find((p) => p.id === planId);
+    if (found) {
+      loadPlan(found);
+      setActivePlan(found.id, found.name);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return null;
+}
+
 // ── Header ──────────────────────────────────────────────────────────
 function PlannerHeader() {
-  const { boxes, moveAllBoxes, setUnfitIds, history, future, undo, redo } =
-    useSceneStore();
+  const {
+    boxes,
+    containerSize,
+    moveAllBoxes,
+    setUnfitIds,
+    history,
+    future,
+    undo,
+    redo,
+    logStep,
+    activePlanId,
+    setActivePlan,
+  } = useSceneStore();
   const { autoPack } = useBinPacking();
   const pathname = usePathname();
+  const router = useRouter();
+
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [saveName, setSaveName] = useState("");
 
   const handleAutoPack = () => {
     if (boxes.length === 0) return;
     const { packed, unfit } = autoPack();
     moveAllBoxes(packed);
     setUnfitIds(unfit);
+    logStep("autoPack", `Auto-packed ${packed.length} boxes`);
+  };
+
+  const handleSave = () => {
+    const id = activePlanId ?? nanoid(8);
+    const plan: SavedPlan = {
+      id,
+      name: saveName.trim() || `Plan ${id.slice(0, 4).toUpperCase()}`,
+      savedAt: Date.now(),
+      containerSize,
+      boxes,
+    };
+    savePlanToStorage(plan);
+    setActivePlan(id, plan.name);
+    setSaveOpen(false);
+    if (!activePlanId) {
+      router.push(`/planner?plan=${id}`);
+    }
   };
 
   const navItems = [
@@ -60,74 +127,119 @@ function PlannerHeader() {
   ];
 
   return (
-    <header className="h-16 flex items-center justify-between px-6 z-50 shrink-0 an-bg-surface">
-      {/* Left: Logo + Nav */}
-      <div className="flex items-center gap-8">
-        <Link href="/" className="flex items-center gap-2">
-          <Box className="w-5 h-5 an-text-primary" />
-          <span className="text-xl font-bold tracking-tighter an-text-primary">
-            3D Cargo Planner
-          </span>
-        </Link>
-        <nav className="hidden md:flex items-center gap-6">
-          {navItems.map(({ label, href }) => (
-            <Link
-              key={href}
-              href={href}
-              className={`text-sm transition-colors duration-200 ${pathname === href ? "an-nav-active" : "an-nav-inactive"}`}
-            >
-              {label}
-            </Link>
-          ))}
-        </nav>
-      </div>
+    <>
+      <header className="h-16 flex items-center justify-between px-6 z-50 shrink-0 an-bg-surface">
+        {/* Left: Logo + Nav */}
+        <div className="flex items-center gap-8">
+          <Link href="/" className="flex items-center gap-2">
+            <Box className="w-5 h-5 an-text-primary" />
+            <span className="text-xl font-bold tracking-tighter an-text-primary">
+              3D Cargo Planner
+            </span>
+          </Link>
+          <nav className="hidden md:flex items-center gap-6">
+            {navItems.map(({ label, href }) => (
+              <Link
+                key={href}
+                href={href}
+                className={`text-sm transition-colors duration-200 ${pathname === href ? "an-nav-active" : "an-nav-inactive"}`}
+              >
+                {label}
+              </Link>
+            ))}
+          </nav>
+        </div>
 
-      {/* Right: Undo/Redo + Auto-pack */}
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-1 px-2 py-1.5 rounded-lg an-undo-redo-group">
+        {/* Right: Undo/Redo + Save + Auto-pack */}
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1 px-2 py-1.5 rounded-lg an-undo-redo-group">
+            <button
+              type="button"
+              title="Undo (Ctrl+Z)"
+              onClick={undo}
+              disabled={history.length === 0}
+              className="p-1 rounded transition-opacity disabled:opacity-30 hover:opacity-70"
+            >
+              <Undo2 className="w-4 h-4 an-text-primary" />
+            </button>
+            <button
+              type="button"
+              title="Redo (Ctrl+Y)"
+              onClick={redo}
+              disabled={future.length === 0}
+              className="p-1 rounded transition-opacity disabled:opacity-30 hover:opacity-70"
+            >
+              <Redo2 className="w-4 h-4 an-text-primary" />
+            </button>
+          </div>
+          <div className="h-6 w-px an-divider-subtle" />
           <button
             type="button"
-            title="Undo (Ctrl+Z)"
-            onClick={undo}
-            disabled={history.length === 0}
-            className="p-1 rounded transition-opacity disabled:opacity-30 hover:opacity-70"
+            onClick={() => { setSaveName(""); setSaveOpen(true); }}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-opacity hover:opacity-80 an-btn-outline-primary"
           >
-            <Undo2 className="w-4 h-4 an-text-primary" />
+            <Save className="w-3.5 h-3.5" />
+            Save
           </button>
+          <div className="h-6 w-px an-divider-subtle" />
+          <ModeToggle />
+          <div className="h-6 w-px an-divider-subtle" />
           <button
             type="button"
-            title="Redo (Ctrl+Y)"
-            onClick={redo}
-            disabled={future.length === 0}
-            className="p-1 rounded transition-opacity disabled:opacity-30 hover:opacity-70"
+            onClick={handleAutoPack}
+            disabled={boxes.length === 0}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-opacity hover:opacity-90 disabled:opacity-40 an-btn-autopack"
           >
-            <Redo2 className="w-4 h-4 an-text-primary" />
+            <Zap className="w-4 h-4" />
+            Auto-pack
           </button>
         </div>
-        <div className="h-6 w-px an-divider-subtle" />
-        <ModeToggle />
-        <div className="h-6 w-px an-divider-subtle" />
-        <button
-          type="button"
-          onClick={handleAutoPack}
-          disabled={boxes.length === 0}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-opacity hover:opacity-90 disabled:opacity-40 an-btn-autopack"
-        >
-          <Zap className="w-4 h-4" />
-          Auto-pack
-        </button>
-      </div>
-    </header>
+      </header>
+
+      {/* Save Plan Dialog */}
+      <Dialog open={saveOpen} onOpenChange={setSaveOpen}>
+        <DialogContent className="an-dialog-content sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="an-text-on-surface">Save Plan</DialogTitle>
+          </DialogHeader>
+          <div className="mt-2">
+            <label className="text-xs mb-1 block an-text-on-surface-muted">ชื่อแผน</label>
+            <Input
+              value={saveName}
+              onChange={(e) => setSaveName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleSave(); }}
+              placeholder="e.g. Shipment #2042"
+              className="an-input"
+              autoFocus
+            />
+          </div>
+          <DialogFooter className="mt-4">
+            <button
+              type="button"
+              onClick={handleSave}
+              className="px-4 py-2 rounded-lg text-sm font-bold transition-opacity hover:opacity-90 an-btn-autopack"
+            >
+              Save
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
 // ── Breadcrumb ───────────────────────────────────────────────────────
 function PlannerBreadcrumb() {
+  const { activePlanName } = useSceneStore();
   return (
     <div className="px-6 py-2 flex items-center gap-2 text-xs font-mono uppercase tracking-widest shrink-0 an-breadcrumb">
-      <span>Load plans</span>
+      <Link href="/load-plans" className="hover:opacity-70 transition-opacity">
+        Load plans
+      </Link>
       <ChevronRight className="w-3.5 h-3.5" />
-      <span className="font-bold an-text-primary">Shipment #2041</span>
+      <span className="font-bold an-text-primary">
+        {activePlanName ?? "New Plan"}
+      </span>
     </div>
   );
 }
@@ -135,10 +247,76 @@ function PlannerBreadcrumb() {
 // ── Left Sidebar ─────────────────────────────────────────────────────
 type TabId = "items" | "container" | "steps";
 
+const STEP_ICONS: Record<StepAction, string> = {
+  addBox: "+",
+  removeBox: "−",
+  moveBox: "↔",
+  autoPack: "⚡",
+  clearBoxes: "✕",
+  undo: "↩",
+  redo: "↪",
+};
+
+const STEP_COLORS: Record<StepAction, string> = {
+  addBox: "an-text-tertiary",
+  removeBox: "text-red-500",
+  moveBox: "an-text-primary",
+  autoPack: "an-text-primary",
+  clearBoxes: "text-red-500",
+  undo: "an-text-on-surface-muted",
+  redo: "an-text-on-surface-muted",
+};
+
 function StepsTab() {
+  const { steps, clearSteps } = useSceneStore();
+
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-3 an-text-on-surface-muted opacity-40">
-      <span className="text-xs">Steps log — coming soon</span>
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between mb-2 px-1">
+        <div className="text-[10px] font-bold uppercase tracking-widest an-section-label">
+          Steps ({steps.length})
+        </div>
+        {steps.length > 0 && (
+          <button
+            type="button"
+            onClick={clearSteps}
+            className="text-[9px] px-2 py-0.5 rounded an-btn-delete-sm"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
+      <div className="flex-1 overflow-y-auto space-y-1 min-h-0">
+        {steps.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 gap-2 an-text-on-surface-muted opacity-40">
+            <span className="text-xs">No steps yet</span>
+          </div>
+        ) : (
+          steps.map((step) => (
+            <div
+              key={step.id}
+              className="flex items-center gap-2 px-2 py-1.5 rounded-lg an-manifest-item"
+            >
+              <span
+                className={`text-xs font-bold w-4 text-center shrink-0 ${STEP_COLORS[step.action]}`}
+              >
+                {STEP_ICONS[step.action]}
+              </span>
+              <span className="flex-1 text-[11px] an-text-on-surface truncate">
+                {step.label}
+              </span>
+              <span className="text-[9px] font-mono an-text-on-surface-muted shrink-0">
+                {new Date(step.timestamp).toLocaleTimeString("th-TH", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  second: "2-digit",
+                })}
+              </span>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }
@@ -285,14 +463,17 @@ function CanvasHUD() {
 }
 
 // ── Page ─────────────────────────────────────────────────────────────
-import { useState } from "react";
-
 export default function PlannerPage() {
   const [activeTab, setActiveTab] = useState<TabId>("items");
   const { viewMode, renderMode, setViewMode, setRenderMode } = useSceneStore();
 
   return (
     <div className="flex flex-col h-screen overflow-hidden an-bg-surface an-text-on-surface">
+      {/* Load plan from URL param before rendering header */}
+      <Suspense fallback={null}>
+        <PlannerLoader />
+      </Suspense>
+
       <PlannerHeader />
       <PlannerBreadcrumb />
 
