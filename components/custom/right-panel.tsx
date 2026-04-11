@@ -3,10 +3,10 @@
 import { useMemo } from 'react'
 import * as THREE from 'three'
 import { CheckCircle2, XCircle, Download, AlertTriangle, RotateCcw, RotateCw } from 'lucide-react'
-import { useSceneStore, getEffectiveSize } from '@/store/useSceneStore'
-import { useBinPacking } from '@/lib/packing/useBinPacking'
-import { validatePlacement } from '@/lib/packing/packingUtils'
-import type { CargoBox } from '@/store/useSceneStore'
+import { useSceneStore, getEffectiveSize } from '@/store/use-scene-store'
+import { useBinPacking } from '@/lib/packing/use-bin-packing'
+import { validatePlacement } from '@/lib/packing/packing-utils'
+import type { CargoBox } from '@/store/use-scene-store'
 
 // ── helpers ─────────────────────────────────────────────────────────
 

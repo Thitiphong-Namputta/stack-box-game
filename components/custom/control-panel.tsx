@@ -15,7 +15,7 @@ import {
   DialogTrigger,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { useSceneStore } from '@/store/useSceneStore'
+import { useSceneStore } from '@/store/use-scene-store'
 
 const containerSchema = z.object({
   w: z.number().min(100).max(2000),

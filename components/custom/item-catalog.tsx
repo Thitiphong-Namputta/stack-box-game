@@ -8,9 +8,9 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
-import { useSceneStore, getNextColor } from '@/store/useSceneStore'
-import { useBinPacking } from '@/lib/packing/useBinPacking'
-import type { CargoBox, CatalogItem } from '@/store/useSceneStore'
+import { useSceneStore, getNextColor } from '@/store/use-scene-store'
+import { useBinPacking } from '@/lib/packing/use-bin-packing'
+import type { CargoBox, CatalogItem } from '@/store/use-scene-store'
 
 // ── ManifestItemCard ────────────────────────────────────────────────
 function ManifestItemCard({ box }: { box: CargoBox }) {

@@ -2,9 +2,9 @@
 
 import { useCallback, useMemo } from 'react'
 import * as THREE from 'three'
-import { useSceneStore } from '@/store/useSceneStore'
-import type { CargoBox } from '@/store/useSceneStore'
-import { suggestPosition, validatePlacement, runAutoPack } from './packingUtils'
+import { useSceneStore } from '@/store/use-scene-store'
+import type { CargoBox } from '@/store/use-scene-store'
+import { suggestPosition, validatePlacement, runAutoPack } from './packing-utils'
 
 export function useBinPacking() {
   const { boxes, containerSize } = useSceneStore()

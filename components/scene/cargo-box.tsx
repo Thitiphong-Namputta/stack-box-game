@@ -4,9 +4,9 @@ import { useRef, useState, useCallback } from 'react'
 import * as THREE from 'three'
 import { useThree, ThreeEvent } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
-import { useSceneStore, getEffectiveSize } from '@/store/useSceneStore'
-import { validatePlacement, getSupportY } from '@/lib/packing/packingUtils'
-import type { CargoBox as CargoBoxType } from '@/store/useSceneStore'
+import { useSceneStore, getEffectiveSize } from '@/store/use-scene-store'
+import { validatePlacement, getSupportY } from '@/lib/packing/packing-utils'
+import type { CargoBox as CargoBoxType } from '@/store/use-scene-store'
 
 interface CargoBoxProps {
   box: CargoBoxType
@@ -118,7 +118,6 @@ export function CargoBox({ box, onDragStart, onDragEnd }: CargoBoxProps) {
       document.addEventListener('pointermove', onPointerMove)
       document.addEventListener('pointerup', onPointerUp)
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [box, boxes, camera, containerSize, gridStep, moveBox, setSelected, getMouseNDC, onDragStart, onDragEnd]
   )
 

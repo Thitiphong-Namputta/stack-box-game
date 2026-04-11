@@ -16,8 +16,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { useSceneStore } from "@/store/useSceneStore";
-import type { CatalogItem } from "@/store/useSceneStore";
+import { useSceneStore } from "@/store/use-scene-store";
+import type { CatalogItem } from "@/store/use-scene-store";
 
 // ── Form schema ─────────────────────────────────────────────────────
 const catalogItemSchema = z.object({
@@ -147,7 +147,7 @@ function CatalogItemDialog({
 
 // ── Nav ─────────────────────────────────────────────────────────────
 const navItems = [
-  { label: "Dashboard", href: "/" },
+  { label: "Dashboard", href: "/dashboard" },
   { label: "3D Planner", href: "/planner" },
   { label: "Load Plans", href: "/load-plans" },
   { label: "Catalog", href: "/catalog" },

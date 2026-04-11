@@ -1,7 +1,7 @@
 'use client'
 
 import * as THREE from 'three'
-import { useSceneStore } from '@/store/useSceneStore'
+import { useSceneStore } from '@/store/use-scene-store'
 
 export function CargoContainer() {
   const { containerSize } = useSceneStore()

@@ -8,11 +8,11 @@ import { ModeToggle } from "@/components/mode-toggle";
 import {
   getSavedPlans,
   deleteSavedPlan,
-} from "@/store/useSceneStore";
-import type { SavedPlan } from "@/store/useSceneStore";
+} from "@/store/use-scene-store";
+import type { SavedPlan } from "@/store/use-scene-store";
 
 const navItems = [
-  { label: "Dashboard", href: "/" },
+  { label: "Dashboard", href: "/dashboard" },
   { label: "3D Planner", href: "/planner" },
   { label: "Load Plans", href: "/load-plans" },
   { label: "Catalog", href: "/catalog" },

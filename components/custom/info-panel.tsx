@@ -4,7 +4,7 @@ import { Trash2, Move3D } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { useSceneStore } from '@/store/useSceneStore'
+import { useSceneStore } from '@/store/use-scene-store'
 
 export function InfoPanel() {
   const { boxes, selectedId, setSelected, removeBox } = useSceneStore()

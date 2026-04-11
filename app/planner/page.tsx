@@ -29,20 +29,20 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { ItemsTab } from "@/components/ui-custom/ItemCatalog";
-import { ContainerTab } from "@/components/ui-custom/ControlPanel";
-import { RightPanel } from "@/components/ui-custom/RightPanel";
+import { ItemsTab } from "@/components/custom/item-catalog";
+import { ContainerTab } from "@/components/custom/control-panel";
+import { RightPanel } from "@/components/custom/right-panel";
 import {
   useSceneStore,
   getSavedPlans,
   savePlanToStorage,
-} from "@/store/useSceneStore";
-import { useBinPacking } from "@/lib/packing/useBinPacking";
-import type { ViewMode, RenderMode, StepAction, SavedPlan } from "@/store/useSceneStore";
+} from "@/store/use-scene-store";
+import { useBinPacking } from "@/lib/packing/use-bin-packing";
+import type { ViewMode, RenderMode, StepAction, SavedPlan } from "@/store/use-scene-store";
 import { ModeToggle } from "@/components/mode-toggle";
 
 const SceneCanvas = dynamic(
-  () => import("@/components/scene/SceneCanvas").then((m) => m.SceneCanvas),
+  () => import("@/components/scene/scene-canvas").then((m) => m.SceneCanvas),
   {
     ssr: false,
     loading: () => (
@@ -120,7 +120,7 @@ function PlannerHeader() {
   };
 
   const navItems = [
-    { label: "Dashboard", href: "/" },
+    { label: "Dashboard", href: "/dashboard" },
     { label: "3D Planner", href: "/planner" },
     { label: "Load Plans", href: "/load-plans" },
     { label: "Catalog", href: "/catalog" },
@@ -251,6 +251,7 @@ const STEP_ICONS: Record<StepAction, string> = {
   addBox: "+",
   removeBox: "−",
   moveBox: "↔",
+  rotateBox: "↻",
   autoPack: "⚡",
   clearBoxes: "✕",
   undo: "↩",
@@ -261,6 +262,7 @@ const STEP_COLORS: Record<StepAction, string> = {
   addBox: "an-text-tertiary",
   removeBox: "text-red-500",
   moveBox: "an-text-primary",
+  rotateBox: "an-text-primary",
   autoPack: "an-text-primary",
   clearBoxes: "text-red-500",
   undo: "an-text-on-surface-muted",

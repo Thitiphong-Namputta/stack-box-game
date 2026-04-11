@@ -1,6 +1,6 @@
 import * as THREE from 'three'
-import { getEffectiveSize } from '@/store/useSceneStore'
-import type { CargoBox, ContainerSize } from '@/store/useSceneStore'
+import { getEffectiveSize } from '@/store/use-scene-store'
+import type { CargoBox, ContainerSize } from '@/store/use-scene-store'
 
 // binpackingjs has no type declarations — use require
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any
