@@ -37,6 +37,7 @@ import {
   getSavedPlans,
   savePlanToStorage,
 } from "@/store/use-scene-store";
+import { fetchPlan, createPlan, updatePlan } from "@/lib/api-client";
 import { useBinPacking } from "@/lib/packing/use-bin-packing";
 import type { ViewMode, RenderMode, StepAction, SavedPlan } from "@/store/use-scene-store";
 import { ModeToggle } from "@/components/mode-toggle";
@@ -61,11 +62,19 @@ function PlannerLoader() {
   useEffect(() => {
     const planId = searchParams.get("plan");
     if (!planId) return;
-    const found = getSavedPlans().find((p) => p.id === planId);
-    if (found) {
-      loadPlan(found);
-      setActivePlan(found.id, found.name);
-    }
+
+    fetchPlan(planId)
+      .then((plan) => {
+        loadPlan(plan);
+        setActivePlan(plan.id, plan.name);
+      })
+      .catch(() => {
+        const found = getSavedPlans().find((p) => p.id === planId);
+        if (found) {
+          loadPlan(found);
+          setActivePlan(found.id, found.name);
+        }
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -102,7 +111,7 @@ function PlannerHeader() {
     logStep("autoPack", `Auto-packed ${packed.length} boxes`);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const id = activePlanId ?? nanoid(8);
     const plan: SavedPlan = {
       id,
@@ -111,11 +120,22 @@ function PlannerHeader() {
       containerSize,
       boxes,
     };
+
     savePlanToStorage(plan);
     setActivePlan(id, plan.name);
     setSaveOpen(false);
     if (!activePlanId) {
       router.push(`/planner?plan=${id}`);
+    }
+
+    try {
+      if (activePlanId) {
+        await updatePlan(plan);
+      } else {
+        await createPlan(plan);
+      }
+    } catch (err) {
+      console.error("DB save failed, localStorage fallback active:", err);
     }
   };
 

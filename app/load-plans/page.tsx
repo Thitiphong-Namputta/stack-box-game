@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Box, FileBox, Clock, Package, Trash2 } from "lucide-react";
@@ -10,6 +10,7 @@ import {
   deleteSavedPlan,
 } from "@/store/use-scene-store";
 import type { SavedPlan } from "@/store/use-scene-store";
+import { fetchPlans, deletePlan as apiDeletePlan } from "@/lib/api-client";
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard" },
@@ -20,13 +21,26 @@ const navItems = [
 
 export default function LoadPlansPage() {
   const pathname = usePathname();
-  const [plans, setPlans] = useState<SavedPlan[]>(() => getSavedPlans());
+  const [plans, setPlans] = useState<SavedPlan[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleDelete = (e: React.MouseEvent, id: string) => {
+  useEffect(() => {
+    fetchPlans()
+      .then(setPlans)
+      .catch(() => setPlans(getSavedPlans()))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.preventDefault();
     e.stopPropagation();
+    try {
+      await apiDeletePlan(id);
+    } catch {
+      // ignore — still remove from localStorage below
+    }
     deleteSavedPlan(id);
-    setPlans(getSavedPlans());
+    setPlans((prev) => prev.filter((p) => p.id !== id));
   };
 
   return (
@@ -66,7 +80,11 @@ export default function LoadPlansPage() {
           </p>
         </div>
 
-        {plans.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-24 an-text-on-surface-muted text-sm">
+            Loading plans...
+          </div>
+        ) : plans.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 an-text-on-surface-muted">
             <FileBox className="w-12 h-12 mb-4 opacity-40" />
             <p className="text-sm">ยังไม่มี plan ที่บันทึกไว้</p>
@@ -141,6 +159,7 @@ export default function LoadPlansPage() {
           </div>
         )}
       </main>
+
     </div>
   );
 }

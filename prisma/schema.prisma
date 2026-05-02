@@ -1,0 +1,61 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id        String        @id @default(cuid())
+  email     String        @unique
+  name      String?
+  createdAt DateTime      @default(now())
+  plans     Plan[]
+  catalog   CatalogItem[]
+}
+
+model Plan {
+  id            String   @id @default(cuid())
+  name          String
+  savedAt       DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  containerSize String
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  boxes         Box[]
+
+  @@index([userId])
+}
+
+model Box {
+  id            String  @id @default(cuid())
+  name          String
+  weight        Float
+  color         String
+  category      String?
+  orientationId Int     @default(0)
+  sizeW         Float
+  sizeH         Float
+  sizeD         Float
+  posX          Float
+  posY          Float
+  posZ          Float
+  planId        String
+  plan          Plan    @relation(fields: [planId], references: [id], onDelete: Cascade)
+}
+
+model CatalogItem {
+  id       String  @id @default(cuid())
+  name     String
+  sizeW    Float
+  sizeH    Float
+  sizeD    Float
+  weight   Float
+  category String?
+  userId   String
+  user     User    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}

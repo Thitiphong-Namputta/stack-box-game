@@ -111,7 +111,9 @@ export interface SceneStore {
 
   // Catalog
   catalog: CatalogItem[]
+  setCatalog: (items: CatalogItem[]) => void
   addCatalogItem: (item: Omit<CatalogItem, 'id'>) => void
+  addCatalogItemWithId: (item: CatalogItem) => void
   updateCatalogItem: (id: string, updates: Omit<CatalogItem, 'id'>) => void
   deleteCatalogItem: (id: string) => void
 
@@ -219,10 +221,15 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
   // Catalog
   catalog: SAMPLE_CATALOG.map((item, i) => ({ ...item, id: `catalog-${i}` })),
 
+  setCatalog: (items) => set({ catalog: items }),
+
   addCatalogItem: (item) =>
     set((state) => ({
       catalog: [...state.catalog, { ...item, id: nanoid(8) }],
     })),
+
+  addCatalogItemWithId: (item) =>
+    set((state) => ({ catalog: [...state.catalog, item] })),
 
   updateCatalogItem: (id, updates) =>
     set((state) => ({

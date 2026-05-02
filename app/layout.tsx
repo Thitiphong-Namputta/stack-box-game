@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Prompt } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import { CatalogProvider } from "@/components/providers/catalog-provider";
 
 const prompt = Prompt({
   variable: "--font-sans",
@@ -31,7 +32,9 @@ export default function RootLayout({
           defaultTheme="dark"
           disableTransitionOnChange
         >
-          {children}
+          <CatalogProvider>
+            {children}
+          </CatalogProvider>
         </ThemeProvider>
       </body>
     </html>

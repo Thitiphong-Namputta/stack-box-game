@@ -18,6 +18,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { useSceneStore } from "@/store/use-scene-store";
 import type { CatalogItem } from "@/store/use-scene-store";
+import {
+  createCatalogItem,
+  updateCatalogItem as apiUpdateCatalogItem,
+  deleteCatalogItem as apiDeleteCatalogItem,
+} from "@/lib/api-client";
 
 // ── Form schema ─────────────────────────────────────────────────────
 const catalogItemSchema = z.object({
@@ -156,29 +161,55 @@ const navItems = [
 // ── CatalogPage ─────────────────────────────────────────────────────
 export default function CatalogPage() {
   const pathname = usePathname();
-  const { catalog, addCatalogItem, updateCatalogItem, deleteCatalogItem } =
-    useSceneStore();
+  const {
+    catalog,
+    addCatalogItemWithId,
+    updateCatalogItem,
+    deleteCatalogItem,
+  } = useSceneStore();
 
   const [addOpen, setAddOpen] = useState(false);
   const [editItem, setEditItem] = useState<CatalogItem | null>(null);
 
-  const handleAdd = (data: CatalogItemForm) => {
-    addCatalogItem({
+  const handleAdd = async (data: CatalogItemForm) => {
+    const payload = {
       name: data.name,
       size: { w: data.w, h: data.h, d: data.d },
       weight: data.weight,
       category: data.category || undefined,
-    });
+    };
+    try {
+      const created = await createCatalogItem(payload);
+      addCatalogItemWithId(created);
+    } catch {
+      // Fallback: add locally without DB
+      addCatalogItemWithId({ ...payload, id: crypto.randomUUID() });
+    }
   };
 
-  const handleEdit = (data: CatalogItemForm) => {
+  const handleEdit = async (data: CatalogItemForm) => {
     if (!editItem) return;
-    updateCatalogItem(editItem.id, {
+    const payload = {
       name: data.name,
       size: { w: data.w, h: data.h, d: data.d },
       weight: data.weight,
       category: data.category || undefined,
-    });
+    };
+    try {
+      await apiUpdateCatalogItem(editItem.id, payload);
+    } catch {
+      // ignore — update store anyway
+    }
+    updateCatalogItem(editItem.id, payload);
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await apiDeleteCatalogItem(id);
+    } catch {
+      // ignore — remove from store anyway
+    }
+    deleteCatalogItem(id);
   };
 
   const editInitialValues = editItem
@@ -285,7 +316,7 @@ export default function CatalogPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => deleteCatalogItem(item.id)}
+                    onClick={() => handleDelete(item.id)}
                     className="p-1.5 rounded-lg transition-colors hover:opacity-70 text-red-500"
                     title="ลบ"
                   >
