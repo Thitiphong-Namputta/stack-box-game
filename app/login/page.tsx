@@ -8,6 +8,7 @@ import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Box } from "lucide-react";
+import Link from "next/link";
 
 const schema = z.object({
   email: z.string().email("อีเมลไม่ถูกต้อง"),
@@ -89,6 +90,13 @@ export default function LoginPage() {
             {isSubmitting ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
           </button>
         </form>
+
+        <p className="text-xs text-slate-400 text-center">
+          ยังไม่มีบัญชี?{" "}
+          <Link href="/register" className="text-indigo-400 hover:text-indigo-300 transition-colors">
+            สมัครสมาชิก
+          </Link>
+        </p>
       </div>
     </div>
   );

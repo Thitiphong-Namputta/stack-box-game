@@ -10,6 +10,6 @@ export const proxy = auth((req) => {
 
 export const config = {
   matcher: [
-    "/((?!login|api/auth|_next/static|_next/image|favicon.ico).*)",
+    "/((?!login|register|api/auth|api/register|_next/static|_next/image|favicon.ico).*)",
   ],
 };
