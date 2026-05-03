@@ -15,6 +15,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { ModeToggle } from "@/components/mode-toggle";
+import { UserNav } from "@/components/custom/user-nav";
 import { BarChart } from "@/components/chart/bar";
 import { LineChart } from "@/components/chart/line";
 import { useSceneStore } from "@/store/use-scene-store";
@@ -198,7 +199,10 @@ export default function DashboardPage() {
             ))}
           </nav>
         </div>
-        <ModeToggle />
+        <div className="flex items-center gap-2">
+          <UserNav />
+          <ModeToggle />
+        </div>
       </header>
 
       {/* Main */}

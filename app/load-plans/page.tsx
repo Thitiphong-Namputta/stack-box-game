@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Box, FileBox, Clock, Package, Trash2 } from "lucide-react";
 import { ModeToggle } from "@/components/mode-toggle";
+import { UserNav } from "@/components/custom/user-nav";
 import {
   getSavedPlans,
   deleteSavedPlan,
@@ -68,7 +69,10 @@ export default function LoadPlansPage() {
             ))}
           </nav>
         </div>
-        <ModeToggle />
+        <div className="flex items-center gap-2">
+          <UserNav />
+          <ModeToggle />
+        </div>
       </header>
 
       {/* Content */}

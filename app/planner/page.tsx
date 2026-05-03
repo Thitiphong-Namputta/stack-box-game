@@ -41,6 +41,7 @@ import { fetchPlan, createPlan, updatePlan } from "@/lib/api-client";
 import { useBinPacking } from "@/lib/packing/use-bin-packing";
 import type { ViewMode, RenderMode, StepAction, SavedPlan } from "@/store/use-scene-store";
 import { ModeToggle } from "@/components/mode-toggle";
+import { UserNav } from "@/components/custom/user-nav";
 
 const SceneCanvas = dynamic(
   () => import("@/components/scene/scene-canvas").then((m) => m.SceneCanvas),
@@ -202,6 +203,7 @@ function PlannerHeader() {
             Save
           </button>
           <div className="h-6 w-px an-divider-subtle" />
+          <UserNav />
           <ModeToggle />
           <div className="h-6 w-px an-divider-subtle" />
           <button

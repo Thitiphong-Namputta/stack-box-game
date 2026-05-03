@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Box, Package, Plus, Pencil, Trash2 } from "lucide-react";
 import { ModeToggle } from "@/components/mode-toggle";
+import { UserNav } from "@/components/custom/user-nav";
 import {
   Dialog,
   DialogContent,
@@ -248,7 +249,10 @@ export default function CatalogPage() {
             ))}
           </nav>
         </div>
-        <ModeToggle />
+        <div className="flex items-center gap-2">
+          <UserNav />
+          <ModeToggle />
+        </div>
       </header>
 
       {/* Content */}
