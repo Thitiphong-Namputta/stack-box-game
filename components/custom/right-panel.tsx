@@ -1,11 +1,12 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import * as THREE from 'three'
-import { CheckCircle2, XCircle, Download, AlertTriangle, RotateCcw, RotateCw } from 'lucide-react'
+import { CheckCircle2, XCircle, Download, AlertTriangle, RotateCcw, RotateCw, FileText, Sheet, Loader2 } from 'lucide-react'
 import { useSceneStore, getEffectiveSize } from '@/store/use-scene-store'
 import { useBinPacking } from '@/lib/packing/use-bin-packing'
 import { validatePlacement } from '@/lib/packing/packing-utils'
+import { exportPDF, exportXLSX } from '@/lib/api-client'
 import type { CargoBox } from '@/store/use-scene-store'
 
 // ── helpers ─────────────────────────────────────────────────────────
@@ -105,8 +106,10 @@ function UtilizationBar({
 // ── RightPanel ───────────────────────────────────────────────────────
 
 export function RightPanel() {
-  const { boxes, selectedId, containerSize, unfitIds, rotateBox, setFlashId } = useSceneStore()
+  const { boxes, selectedId, containerSize, unfitIds, rotateBox, setFlashId, activePlanId, activePlanName } = useSceneStore()
   const { spaceUtilization } = useBinPacking()
+  const [pdfLoading, setPdfLoading] = useState(false)
+  const [xlsxLoading, setXlsxLoading] = useState(false)
   const selected = boxes.find((b) => b.id === selectedId)
 
   const totalWeight = boxes.reduce((sum, b) => sum + (b.weight ?? 0), 0)
@@ -124,6 +127,22 @@ export function RightPanel() {
       { label: 'No collisions', pass: noCollision },
     ]
   }, [boxes, totalWeight, containerSize.maxWeight, spaceUtilization])
+
+  const exportPayload = () => ({
+    plan: { id: activePlanId, name: activePlanName },
+    containerSize,
+    boxes,
+  })
+
+  const handleExportPDF = async () => {
+    setPdfLoading(true)
+    try { await exportPDF(exportPayload()) } finally { setPdfLoading(false) }
+  }
+
+  const handleExportXLSX = async () => {
+    setXlsxLoading(true)
+    try { await exportXLSX(exportPayload()) } finally { setXlsxLoading(false) }
+  }
 
   const handleExport = () => {
     const data = {
@@ -312,16 +331,40 @@ export function RightPanel() {
         )}
 
         {/* Export */}
-        <div className="mt-6 pt-6 an-section-border-top">
+        <div className="mt-6 pt-6 an-section-border-top space-y-2">
           <button
             type="button"
             onClick={handleExport}
             disabled={boxes.length === 0}
-            className="w-full py-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all hover:opacity-80 disabled:opacity-30 an-btn-export"
+            className="w-full py-2.5 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all hover:opacity-80 disabled:opacity-30 an-btn-export"
           >
             <Download className="w-3.5 h-3.5" />
-            Export Plan (.JSON)
+            Export JSON
           </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleExportPDF}
+              disabled={boxes.length === 0 || pdfLoading}
+              className="flex-1 py-2.5 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all hover:opacity-80 disabled:opacity-30 an-btn-export"
+            >
+              {pdfLoading
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <FileText className="w-3.5 h-3.5" />}
+              PDF
+            </button>
+            <button
+              type="button"
+              onClick={handleExportXLSX}
+              disabled={boxes.length === 0 || xlsxLoading}
+              className="flex-1 py-2.5 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all hover:opacity-80 disabled:opacity-30 an-btn-export"
+            >
+              {xlsxLoading
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <Sheet className="w-3.5 h-3.5" />}
+              Excel
+            </button>
+          </div>
         </div>
       </section>
     </aside>
