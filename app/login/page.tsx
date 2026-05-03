@@ -48,7 +48,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm space-y-6 p-8 rounded-2xl bg-slate-900 border border-slate-800">
         <div className="flex items-center gap-2 justify-center">
           <Box className="w-6 h-6 text-indigo-400" />
-          <span className="text-xl font-bold text-white">3D Cargo Planner</span>
+          <span className="text-xl font-bold text-white">STACK BOX</span>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">

@@ -12,8 +12,8 @@ const prompt = Prompt({
 });
 
 export const metadata: Metadata = {
-  title: "3D Box Stacking Game",
-  description: "A simple 3D box stacking game built with React Three Fiber and Next.js.",
+  title: "STACK BOX",
+  description: "3D cargo box planner built with React Three Fiber and Next.js.",
 };
 
 export default function RootLayout({

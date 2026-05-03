@@ -182,7 +182,7 @@ export default function DashboardPage() {
           <Link href="/" className="flex items-center gap-2">
             <Box className="w-5 h-5 an-text-primary" />
             <span className="text-xl font-bold tracking-tighter an-text-primary">
-              3D Cargo Planner
+              STACK BOX
             </span>
           </Link>
           <nav className="hidden md:flex items-center gap-6">
