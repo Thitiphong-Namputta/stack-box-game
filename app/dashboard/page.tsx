@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -17,8 +17,9 @@ import {
 import { ModeToggle } from "@/components/mode-toggle";
 import { BarChart } from "@/components/chart/bar";
 import { LineChart } from "@/components/chart/line";
-import { getSavedPlans, useSceneStore } from "@/store/use-scene-store";
+import { useSceneStore } from "@/store/use-scene-store";
 import type { SavedPlan } from "@/store/use-scene-store";
+import { fetchPlans } from "@/lib/api-client";
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard" },
@@ -94,7 +95,11 @@ function EmptyChart({ message }: { message: string }) {
 export default function DashboardPage() {
   const pathname = usePathname();
   const catalog = useSceneStore((s) => s.catalog);
-  const [plans] = useState<SavedPlan[]>(() => getSavedPlans());
+  const [plans, setPlans] = useState<SavedPlan[]>([]);
+
+  useEffect(() => {
+    fetchPlans().then(setPlans).catch(() => {});
+  }, []);
 
   // Sort newest first
   const sortedPlans = useMemo(
