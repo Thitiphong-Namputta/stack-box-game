@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { ensureUser, getUserId } from '@/lib/db-helpers'
+import { auth } from '@/auth'
 import { toCatalogItem, toCatalogItemData } from '@/lib/transforms'
 import type { CatalogItem } from '@/store/use-scene-store'
 
-export async function GET(request: Request) {
-  const userId = getUserId(request)
-  await ensureUser(userId)
+export async function GET() {
+  const session = await auth()
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  const userId = session.user.id
 
   const items = await prisma.catalogItem.findMany({
     where: { userId },
@@ -17,8 +20,11 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const userId = getUserId(request)
-  await ensureUser(userId)
+  const session = await auth()
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  const userId = session.user.id
 
   const body: Omit<CatalogItem, 'id'> = await request.json()
 

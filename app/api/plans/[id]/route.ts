@@ -1,16 +1,19 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { ensureUser, getUserId } from '@/lib/db-helpers'
+import { auth } from '@/auth'
 import { toSavedPlan, toBoxData } from '@/lib/transforms'
 import type { SavedPlan } from '@/store/use-scene-store'
 
 export async function GET(
-  request: Request,
+  _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const userId = getUserId(request)
-  await ensureUser(userId)
+  const session = await auth()
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  const userId = session.user.id
 
   const plan = await prisma.plan.findFirst({
     where: { id, userId },
@@ -26,8 +29,11 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const userId = getUserId(request)
-  await ensureUser(userId)
+  const session = await auth()
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  const userId = session.user.id
 
   const plan: SavedPlan = await request.json()
 
@@ -62,12 +68,15 @@ export async function PUT(
 }
 
 export async function DELETE(
-  request: Request,
+  _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const userId = getUserId(request)
-  await ensureUser(userId)
+  const session = await auth()
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  const userId = session.user.id
 
   const plan = await prisma.plan.findFirst({ where: { id, userId } })
   if (!plan) return NextResponse.json({ error: 'Not found' }, { status: 404 })

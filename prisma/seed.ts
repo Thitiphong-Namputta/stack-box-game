@@ -1,4 +1,5 @@
 import 'dotenv/config'
+import bcrypt from 'bcryptjs'
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
 import { PrismaClient } from '../lib/generated/prisma/client'
 
@@ -16,6 +17,18 @@ async function main() {
     },
   })
   console.log('Seeded demo user:', demo.id)
+
+  const hash = await bcrypt.hash('admin1234', 12)
+  const admin = await prisma.user.upsert({
+    where: { email: 'admin@cargo-planner.local' },
+    update: {},
+    create: {
+      email: 'admin@cargo-planner.local',
+      name: 'Admin',
+      passwordHash: hash,
+    },
+  })
+  console.log('Seeded admin user:', admin.id)
 }
 
 main()

@@ -2,7 +2,6 @@ import type { SavedPlan, CatalogItem } from '@/store/use-scene-store'
 
 const HEADERS: HeadersInit = {
   'Content-Type': 'application/json',
-  'x-user-id': 'demo',
 }
 
 function assertOk(res: Response): Response {
