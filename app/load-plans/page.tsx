@@ -3,7 +3,9 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Box, FileBox, Clock, Package, Trash2 } from "lucide-react";
+import { Box, FileBox, Clock, Package, Trash2, LayoutList, Table2 } from "lucide-react";
+import { DataTable } from "@/components/ui/data-table";
+import { getPlanColumns } from "./columns";
 import { ModeToggle } from "@/components/mode-toggle";
 import { UserNav } from "@/components/custom/user-nav";
 import {
@@ -24,6 +26,7 @@ export default function LoadPlansPage() {
   const pathname = usePathname();
   const [plans, setPlans] = useState<SavedPlan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<'list' | 'table'>('list');
 
   useEffect(() => {
     fetchPlans()
@@ -77,11 +80,31 @@ export default function LoadPlansPage() {
 
       {/* Content */}
       <main className="flex-1 max-w-4xl w-full mx-auto px-6 py-10">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold an-text-on-surface">Load Plans</h1>
-          <p className="text-sm mt-1 an-text-on-surface-muted">
-            เลือก plan ที่บันทึกไว้เพื่อแก้ไขใน 3D Planner
-          </p>
+        <div className="flex items-start justify-between mb-8">
+          <div>
+            <h1 className="text-2xl font-bold an-text-on-surface">Load Plans</h1>
+            <p className="text-sm mt-1 an-text-on-surface-muted">
+              เลือก plan ที่บันทึกไว้เพื่อแก้ไขใน 3D Planner
+            </p>
+          </div>
+          <div className="flex items-center gap-1 p-1 rounded-lg an-bg-surface-low">
+            <button
+              type="button"
+              onClick={() => setViewMode('list')}
+              className={`p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'an-bg-surface-container an-text-primary' : 'an-text-on-surface-muted hover:an-text-on-surface'}`}
+              title="List view"
+            >
+              <LayoutList className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('table')}
+              className={`p-1.5 rounded-md transition-colors ${viewMode === 'table' ? 'an-bg-surface-container an-text-primary' : 'an-text-on-surface-muted hover:an-text-on-surface'}`}
+              title="Table view"
+            >
+              <Table2 className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {loading ? (
@@ -99,6 +122,17 @@ export default function LoadPlansPage() {
               → ไปที่ 3D Planner
             </Link>
           </div>
+        ) : viewMode === 'table' ? (
+          <DataTable
+            columns={getPlanColumns((id) => {
+              // wrap to match handleDelete signature (no event needed in table context)
+              setPlans((prev) => prev.filter((p) => p.id !== id));
+              try { apiDeletePlan(id) } catch { /* ignore */ }
+              deleteSavedPlan(id);
+            })}
+            data={plans}
+            filterPlaceholder="ค้นหา plan..."
+          />
         ) : (
           <div className="flex flex-col gap-3">
             {plans.map((plan) => {

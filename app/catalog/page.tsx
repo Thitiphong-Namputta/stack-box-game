@@ -6,7 +6,9 @@ import { usePathname } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Box, Package, Plus, Pencil, Trash2 } from "lucide-react";
+import { Box, Package, Plus, Pencil, Trash2, LayoutList, Table2 } from "lucide-react";
+import { DataTable } from "@/components/ui/data-table";
+import { getCatalogColumns } from "./columns";
 import { ModeToggle } from "@/components/mode-toggle";
 import { UserNav } from "@/components/custom/user-nav";
 import {
@@ -171,6 +173,7 @@ export default function CatalogPage() {
 
   const [addOpen, setAddOpen] = useState(false);
   const [editItem, setEditItem] = useState<CatalogItem | null>(null);
+  const [viewMode, setViewMode] = useState<'list' | 'table'>('list');
 
   const handleAdd = async (data: CatalogItemForm) => {
     const payload = {
@@ -264,17 +267,48 @@ export default function CatalogPage() {
               รายการสินค้าและกล่องทั้งหมด ({catalog.length} รายการ)
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setAddOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-opacity hover:opacity-90 an-btn-autopack"
-          >
-            <Plus className="w-4 h-4" />
-            เพิ่มสินค้า
-          </button>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1 p-1 rounded-lg an-bg-surface-low">
+              <button
+                type="button"
+                onClick={() => setViewMode('list')}
+                className={`p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'an-bg-surface-container an-text-primary' : 'an-text-on-surface-muted hover:an-text-on-surface'}`}
+                title="Grid view"
+              >
+                <LayoutList className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('table')}
+                className={`p-1.5 rounded-md transition-colors ${viewMode === 'table' ? 'an-bg-surface-container an-text-primary' : 'an-text-on-surface-muted hover:an-text-on-surface'}`}
+                title="Table view"
+              >
+                <Table2 className="w-4 h-4" />
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAddOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-opacity hover:opacity-90 an-btn-autopack"
+            >
+              <Plus className="w-4 h-4" />
+              เพิ่มสินค้า
+            </button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {viewMode === 'table' ? (
+          <DataTable
+            columns={getCatalogColumns(
+              (item) => setEditItem(item),
+              handleDelete,
+            )}
+            data={catalog}
+            filterPlaceholder="ค้นหาสินค้า..."
+          />
+        ) : null}
+
+        <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 ${viewMode === 'table' ? 'hidden' : ''}`}>
           {catalog.map((item) => (
             <div
               key={item.id}
@@ -338,7 +372,7 @@ export default function CatalogPage() {
           ))}
         </div>
 
-        {catalog.length === 0 && (
+        {catalog.length === 0 && viewMode === 'list' && (
           <div className="flex flex-col items-center justify-center py-24 an-text-on-surface-muted">
             <Package className="w-12 h-12 mb-4 opacity-40" />
             <p className="text-sm">ยังไม่มีสินค้าใน Catalog</p>

@@ -20,6 +20,7 @@
     "@react-pdf/renderer": "^4.5.1",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",
+    "@tanstack/react-table": "^8.21.3",
     "@types/three": "^0.183.1",
     "@use-gesture/react": "^10.3.1",
     "bcryptjs": "^3.0.3",
