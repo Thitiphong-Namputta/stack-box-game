@@ -117,6 +117,10 @@ export interface SceneStore {
   setViewMode: (v: ViewMode) => void
   setRenderMode: (r: RenderMode) => void
 
+  // Multi-select mode toggle
+  multiSelectMode: boolean
+  toggleMultiSelectMode: () => void
+
   // Camera ops (triggered from outside Canvas)
   cameraOp: CameraOp | null
   triggerCameraOp: (op: CameraOp) => void
@@ -234,6 +238,9 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
   renderMode: 'solid',
   setViewMode: (viewMode) => set({ viewMode }),
   setRenderMode: (renderMode) => set({ renderMode }),
+
+  multiSelectMode: false,
+  toggleMultiSelectMode: () => set((s) => ({ multiSelectMode: !s.multiSelectMode })),
 
   cameraOp: null,
   triggerCameraOp: (op) => set({ cameraOp: op }),

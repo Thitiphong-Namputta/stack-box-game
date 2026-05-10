@@ -20,6 +20,7 @@ import {
   ArrowDown,
   ArrowRight,
   Save,
+  BoxSelect,
 } from "lucide-react";
 import {
   Dialog,
@@ -398,6 +399,8 @@ function FloatingToolbar({
   renderMode: RenderMode;
   onRenderMode: (r: RenderMode) => void;
 }) {
+  const { multiSelectMode, toggleMultiSelectMode } = useSceneStore();
+
   const viewOptions: { id: ViewMode; icon: React.ReactNode; title: string }[] =
     [
       { id: "3d", icon: <Box className="w-4 h-4" />, title: "3D View" },
@@ -437,7 +440,7 @@ function FloatingToolbar({
       </div>
 
       {/* Render mode group */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 pr-2 an-toolbar-section-divider">
         {renderOptions.map(({ id, icon, label }) => (
           <button
             key={id}
@@ -450,6 +453,17 @@ function FloatingToolbar({
           </button>
         ))}
       </div>
+
+      {/* Multi-select toggle */}
+      <button
+        type="button"
+        title={multiSelectMode ? "Multi-select: ON (click to disable)" : "Multi-select: OFF (click to enable)"}
+        onClick={toggleMultiSelectMode}
+        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${multiSelectMode ? "an-render-btn-active" : "an-render-btn-inactive"}`}
+      >
+        <BoxSelect className="w-4 h-4" />
+        Multi
+      </button>
     </div>
   );
 }

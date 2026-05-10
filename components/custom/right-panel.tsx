@@ -198,9 +198,10 @@ export function RightPanel() {
   }
 
   return (
-    <aside className="w-[320px] shrink-0 flex flex-col z-40 an-right-panel">
+    <aside className="w-[320px] shrink-0 flex flex-col z-40 an-right-panel h-full">
+      <div className="flex-1 overflow-y-auto min-h-0">
       {/* Utilization Metrics */}
-      <section className="p-6 shrink-0 an-section-border-bottom">
+      <section className="p-6 an-section-border-bottom">
         <SectionLabel>Utilization Metrics</SectionLabel>
         <div className="space-y-6 mt-4">
           <UtilizationBar
@@ -308,7 +309,7 @@ export function RightPanel() {
       {selectedCount > 1 ? (
         <MultiSelectPanel />
       ) : (
-      <section className="flex-1 p-6 overflow-y-auto">
+      <section className="p-6">
         <SectionLabel>
           {selected ? `Selection: ${selected.name}` : 'Selection'}
         </SectionLabel>
@@ -422,6 +423,7 @@ export function RightPanel() {
         </div>
       </section>
       )}
+      </div>
     </aside>
   )
 }

@@ -109,6 +109,7 @@ export function SceneCanvas() {
     setOverrideRequest,
   } = useSceneStore()
   const selectedCount = useSceneStore((s) => s.selectedIds.size)
+  const multiSelectMode = useSceneStore((s) => s.multiSelectMode)
   const orbitRef = useRef<OrbitControlsImpl>(null)
   const canvasWrapperRef = useRef<HTMLDivElement>(null)
   const cameraRef = useRef<THREE.Camera | null>(null)
@@ -116,6 +117,7 @@ export function SceneCanvas() {
 
   type Point = { x: number; y: number }
   const [dragRect, setDragRect] = useState<{ start: Point; current: Point } | null>(null)
+  const [boxSelectStart, setBoxSelectStart] = useState<Point | null>(null)
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -256,6 +258,36 @@ export function SceneCanvas() {
     }
   }, [dragRect])
 
+  // Threshold-based box-select: only activate dragRect after pointer moves > 5px
+  useEffect(() => {
+    if (!boxSelectStart) return
+    const THRESHOLD = 5
+
+    const onMove = (e: PointerEvent) => {
+      const wrapper = canvasWrapperRef.current
+      if (!wrapper) return
+      const rect = wrapper.getBoundingClientRect()
+      const current = { x: e.clientX - rect.left, y: e.clientY - rect.top }
+      const dist = Math.hypot(current.x - boxSelectStart.x, current.y - boxSelectStart.y)
+      if (dist >= THRESHOLD) {
+        setDragRect({ start: boxSelectStart, current })
+        setBoxSelectStart(null)
+      }
+    }
+
+    const onUp = () => {
+      clearSelection()
+      setBoxSelectStart(null)
+    }
+
+    document.addEventListener('pointermove', onMove)
+    document.addEventListener('pointerup', onUp)
+    return () => {
+      document.removeEventListener('pointermove', onMove)
+      document.removeEventListener('pointerup', onUp)
+    }
+  }, [boxSelectStart, clearSelection])
+
   const handleBoxDragStart = useCallback(() => {
     setIsDragging(true)
     if (orbitRef.current) orbitRef.current.enabled = false
@@ -358,15 +390,11 @@ export function SceneCanvas() {
           far: 10000,
         }}
         onPointerMissed={(e) => {
-          // Start box-select drag on background click
+          if (!multiSelectMode) { clearSelection(); return }
           const wrapper = canvasWrapperRef.current
-          if (wrapper) {
-            const rect = wrapper.getBoundingClientRect()
-            const pt = { x: e.clientX - rect.left, y: e.clientY - rect.top }
-            setDragRect({ start: pt, current: pt })
-          } else {
-            clearSelection()
-          }
+          if (!wrapper) { clearSelection(); return }
+          const rect = wrapper.getBoundingClientRect()
+          setBoxSelectStart({ x: e.clientX - rect.left, y: e.clientY - rect.top })
         }}
         className="w-full h-full"
       >

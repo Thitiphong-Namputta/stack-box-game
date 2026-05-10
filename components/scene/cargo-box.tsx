@@ -34,6 +34,7 @@ export function CargoBox({ box, onDragStart, onDragEnd }: CargoBoxProps) {
   } = useSceneStore()
 
   const isSelected = useSceneStore((s) => s.selectedIds.has(box.id))
+  const multiSelectMode = useSceneStore((s) => s.multiSelectMode)
   const isFlashing = flashId === box.id
 
   const isDraggingRef = useRef(false)
@@ -67,13 +68,13 @@ export function CargoBox({ box, onDragStart, onDragEnd }: CargoBoxProps) {
       const isShift = e.nativeEvent.shiftKey
       const isMod = e.nativeEvent.ctrlKey || e.nativeEvent.metaKey
 
-      if (isShift || isMod) {
+      if (multiSelectMode && (isShift || isMod)) {
         toggleSelected(box.id)
         return
       }
 
       const storeState = useSceneStore.getState()
-      const isMultiSelected = storeState.selectedIds.size > 1 && storeState.selectedIds.has(box.id)
+      const isMultiSelected = multiSelectMode && storeState.selectedIds.size > 1 && storeState.selectedIds.has(box.id)
 
       // Click on unselected box → replace selection
       if (!storeState.selectedIds.has(box.id)) {
