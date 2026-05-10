@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Settings2, Trash2 } from 'lucide-react'
+import { Settings2, Trash2, Ship } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -15,6 +15,15 @@ import {
   DialogTrigger,
   DialogFooter,
 } from '@/components/ui/dialog'
+import {
+  Sheet,
+  SheetTrigger,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { ContainerPresets } from '@/components/custom/container-presets'
 import { useSceneStore } from '@/store/use-scene-store'
 
 const containerSchema = z.object({
@@ -46,6 +55,8 @@ export function ContainerTab() {
     boxes,
   } = useSceneStore()
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [presetOpen, setPresetOpen] = useState(false)
+  const [activeTemplateId, setActiveTemplateId] = useState<string | undefined>()
 
   const {
     register,
@@ -111,6 +122,29 @@ export function ContainerTab() {
             Max {containerSize.maxWeight} kg
           </div>
         </div>
+
+        {/* Browse Container Templates */}
+        <Sheet open={presetOpen} onOpenChange={setPresetOpen}>
+          <SheetTrigger className="w-full inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold transition-all hover:opacity-80 mb-2 an-btn-outline-primary">
+            <Ship className="w-3.5 h-3.5" />
+            Browse Container Templates
+          </SheetTrigger>
+          <SheetContent side="left" className="w-96 p-6 an-sheet-content">
+            <SheetHeader>
+              <SheetTitle className="an-text-on-surface">Container Templates</SheetTitle>
+            </SheetHeader>
+            <ScrollArea className="h-[calc(100vh-120px)] mt-4">
+              <ContainerPresets
+                selectedId={activeTemplateId}
+                onSelect={(t) => {
+                  setContainerSize({ w: t.size.w, h: t.size.h, d: t.size.d, maxWeight: t.maxWeight })
+                  setActiveTemplateId(t.id)
+                  setPresetOpen(false)
+                }}
+              />
+            </ScrollArea>
+          </SheetContent>
+        </Sheet>
 
         {/* Container Settings Dialog */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

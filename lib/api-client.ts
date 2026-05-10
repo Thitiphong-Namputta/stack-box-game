@@ -1,4 +1,5 @@
 import type { SavedPlan, CatalogItem, CargoBox, ContainerSize } from '@/store/use-scene-store'
+import type { ContainerTemplate } from '@/lib/container-templates/types'
 
 const HEADERS: HeadersInit = {
   'Content-Type': 'application/json',
@@ -72,6 +73,27 @@ export async function updateCatalogItem(
 export async function deleteCatalogItem(id: string): Promise<void> {
   const res = await fetch(`/api/catalog/${id}`, { method: 'DELETE', headers: HEADERS })
   if (!res.ok) throw new Error(`Delete catalog item failed: ${res.status}`)
+}
+
+// ── Container Templates ────────────────────────────────────────────
+
+export async function fetchCustomTemplates(): Promise<ContainerTemplate[]> {
+  return fetch('/api/container-templates', { headers: HEADERS }).then((r) => json(r))
+}
+
+export async function createCustomTemplate(
+  data: Omit<ContainerTemplate, 'id' | 'isCustom' | 'userId'>
+): Promise<ContainerTemplate> {
+  return fetch('/api/container-templates', {
+    method: 'POST',
+    headers: HEADERS,
+    body: JSON.stringify(data),
+  }).then((r) => json(r))
+}
+
+export async function deleteCustomTemplate(id: string): Promise<void> {
+  const res = await fetch(`/api/container-templates/${id}`, { method: 'DELETE', headers: HEADERS })
+  if (!res.ok) throw new Error(`Delete template failed: ${res.status}`)
 }
 
 // ── Export ─────────────────────────────────────────────────────────

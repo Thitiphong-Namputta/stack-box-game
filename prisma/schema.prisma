@@ -8,13 +8,14 @@ datasource db {
 }
 
 model User {
-  id           String        @id @default(cuid())
-  email        String        @unique
-  name         String?
-  passwordHash String?
-  createdAt    DateTime      @default(now())
-  plans        Plan[]
-  catalog      CatalogItem[]
+  id                 String              @id @default(cuid())
+  email              String              @unique
+  name               String?
+  passwordHash       String?
+  createdAt          DateTime            @default(now())
+  plans              Plan[]
+  catalog            CatalogItem[]
+  containerTemplates ContainerTemplate[]
 }
 
 model Plan {
@@ -57,6 +58,24 @@ model CatalogItem {
   category String?
   userId   String
   user     User    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model ContainerTemplate {
+  id          String   @id @default(cuid())
+  code        String
+  name        String
+  category    String
+  sizeW       Float
+  sizeH       Float
+  sizeD       Float
+  maxWeight   Float
+  tareWeight  Float?
+  description String?
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  createdAt   DateTime @default(now())
 
   @@index([userId])
 }
