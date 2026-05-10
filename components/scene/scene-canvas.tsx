@@ -15,6 +15,13 @@ import { SelectionRectangle } from './selection-rectangle'
 import { pickBoxesInRect } from '@/lib/selection/frustum-select'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import type { CargoBox as CargoBoxType } from '@/store/use-scene-store'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
 
 // ── CameraController ───────────────────────────────────────────────────
 function CameraController({
@@ -98,8 +105,9 @@ export function SceneCanvas() {
     removeSelected,
     rotateSelected,
     moveSelected,
+    overrideRequest,
+    setOverrideRequest,
   } = useSceneStore()
-  const selectedId = useSceneStore((s) => s.selectedIds.size === 1 ? Array.from(s.selectedIds)[0] : null)
   const selectedCount = useSceneStore((s) => s.selectedIds.size)
   const orbitRef = useRef<OrbitControlsImpl>(null)
   const canvasWrapperRef = useRef<HTMLDivElement>(null)
@@ -314,6 +322,14 @@ export function SceneCanvas() {
       category: dragPreview.category,
       orientationId: 0,
       position: dragPreview.position,
+      fragile: dragPreview.fragile,
+      thisSideUp: dragPreview.thisSideUp,
+      nonStackable: dragPreview.nonStackable,
+      cannotBeStackedOn: dragPreview.cannotBeStackedOn,
+      maxStackWeight: dragPreview.maxStackWeight,
+      hazmat: dragPreview.hazmat,
+      temperature: dragPreview.temperature,
+      priority: dragPreview.priority,
     })
     setDragPreview(null)
   }, [dragPreview, addBox, setDragPreview])
@@ -429,6 +445,44 @@ export function SceneCanvas() {
           </span>
         </div>
       )}
+
+      {/* Constraint Override Dialog */}
+      <Dialog open={!!overrideRequest} onOpenChange={(open) => { if (!open) setOverrideRequest(null) }}>
+        <DialogContent className="an-dialog-content sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="an-text-error">⚠️ ละเมิดกฎการวางซ้อน</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm an-text-on-surface mt-2">{overrideRequest?.reason}</p>
+          <p className="text-xs an-text-on-surface-muted mt-2">
+            คุณต้องการดำเนินการต่อหรือไม่? การละเมิดจะแสดงในรายงาน Constraint Analysis
+          </p>
+          <DialogFooter className="mt-4 gap-2 flex-row justify-end">
+            <button
+              type="button"
+              onClick={() => setOverrideRequest(null)}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium an-btn-outline-primary"
+            >
+              ยกเลิก
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (overrideRequest) {
+                  moveBox(overrideRequest.boxId, new THREE.Vector3(
+                    overrideRequest.newPos.x,
+                    overrideRequest.newPos.y,
+                    overrideRequest.newPos.z
+                  ))
+                }
+                setOverrideRequest(null)
+              }}
+              className="px-3 py-1.5 rounded-lg text-sm font-bold text-white bg-red-600 hover:bg-red-700 transition-colors"
+            >
+              ดำเนินการต่อ
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

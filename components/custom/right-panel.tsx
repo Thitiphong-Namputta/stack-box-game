@@ -8,6 +8,7 @@ import { useBinPacking } from '@/lib/packing/use-bin-packing'
 import { validatePlacement } from '@/lib/packing/packing-utils'
 import { exportPDF, exportXLSX } from '@/lib/api-client'
 import type { CargoBox } from '@/store/use-scene-store'
+import { auditAllConstraints } from '@/lib/packing/constraints'
 import { StabilityPanel } from './stability-panel'
 import { MultiSelectPanel } from './multi-select-panel'
 
@@ -131,6 +132,13 @@ export function RightPanel() {
       { label: 'No collisions', pass: noCollision },
     ]
   }, [boxes, totalWeight, containerSize.maxWeight, spaceUtilization])
+
+  const stackingViolations = useMemo(
+    () => auditAllConstraints(boxes, containerSize),
+    [boxes, containerSize]
+  )
+  const stackingErrors = stackingViolations.filter((v) => v.severity === 'error')
+  const stackingWarnings = stackingViolations.filter((v) => v.severity === 'warning')
 
   const exportPayload = () => ({
     plan: { id: activePlanId, name: activePlanName },
@@ -258,6 +266,42 @@ export function RightPanel() {
             </div>
           ))}
         </div>
+
+        {stackingErrors.length > 0 && (
+          <div className="mt-4">
+            <div className="text-[10px] font-bold an-text-error uppercase tracking-widest mb-2">
+              🚨 Stacking Violations ({stackingErrors.length})
+            </div>
+            {stackingErrors.map((v, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => {
+                  v.boxIds.forEach((id) => {
+                    setFlashId(id)
+                    setTimeout(() => setFlashId(null), 1500)
+                  })
+                }}
+                className="w-full text-left text-[11px] p-2 mb-1 rounded an-constraint-item-fail hover:opacity-80 transition-opacity"
+              >
+                {v.message}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {stackingWarnings.length > 0 && (
+          <div className="mt-3">
+            <div className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--color-an-primary)' }}>
+              ⚠️ Warnings ({stackingWarnings.length})
+            </div>
+            {stackingWarnings.map((v, i) => (
+              <div key={i} className="text-[11px] p-2 mb-1 rounded an-constraint-item opacity-80">
+                {v.message}
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Selected Item Details — switches between single / multi / empty */}

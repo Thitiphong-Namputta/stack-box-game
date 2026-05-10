@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { getEffectiveSize } from '@/store/use-scene-store'
 import type { CargoBox, ContainerSize } from '@/store/use-scene-store'
+import { validateStackingConstraints } from './constraints'
 
 // binpackingjs has no type declarations — use require
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any
@@ -100,8 +101,9 @@ export function validatePlacement(
   movingBox: CargoBox,
   newPos: THREE.Vector3,
   otherBoxes: CargoBox[],
-  containerSize: ContainerSize
-): { valid: boolean; reason?: string } {
+  containerSize: ContainerSize,
+  options: { skipConstraints?: boolean } = {}
+): { valid: boolean; reason?: string; warnings?: string[] } {
   const ms = getEffectiveSize(movingBox)
 
   // Boundary check (position = center of box)
@@ -143,6 +145,19 @@ export function validatePlacement(
     }
   }
 
+  // Stacking constraint checks
+  if (!options.skipConstraints) {
+    const violations = validateStackingConstraints(movingBox, newPos, otherBoxes)
+    const errors = violations.filter((v) => v.severity === 'error')
+    if (errors.length > 0) {
+      return { valid: false, reason: errors[0].message }
+    }
+    const warnings = violations.filter((v) => v.severity === 'warning').map((v) => v.message)
+    if (warnings.length > 0) {
+      return { valid: true, warnings }
+    }
+  }
+
   return { valid: true }
 }
 
@@ -153,19 +168,47 @@ export function runAutoPack(
   try {
     const packer = new Packer()
     packer.addBin(toPackingBin(containerSize))
-    boxes.forEach((b) => packer.addItem(toPackingItem(b)))
+
+    // Sort: cannotBeStackedOn first (floor items), then by priority desc (high priority = near door)
+    const sorted = [...boxes].sort((a, b) => {
+      const aFloor = a.cannotBeStackedOn ? 1 : 0
+      const bFloor = b.cannotBeStackedOn ? 1 : 0
+      if (aFloor !== bFloor) return bFloor - aFloor
+      return (b.priority ?? 3) - (a.priority ?? 3)
+    })
+    sorted.forEach((b) => packer.addItem(toPackingItem(b)))
     packer.pack()
 
     const bin = packer.bins[0]
-    const packed = (bin?.items ?? []).map(
+    const packedItems = (bin?.items ?? []).map(
       (item: { name: string; position: number[]; width: number; height: number; depth: number }) => ({
         id: item.name,
         position: itemCenter(item),
       })
     )
 
-    const unfit = (packer.unfitItems ?? []).map((item: { name: string }) => item.name)
-    return { packed, unfit }
+    const unfit: string[] = (packer.unfitItems ?? []).map((item: { name: string }) => item.name)
+
+    // Post-process: flag constraint violations as unfit
+    type PackedItem = { id: string; position: { x: number; y: number; z: number } }
+    const packedBoxMap = new Map(boxes.map((b) => [b.id, b]))
+    const constraintUnfit: string[] = []
+    for (const packed of packedItems) {
+      const box = packedBoxMap.get(packed.id)
+      if (!box) continue
+      const others = (packedItems as PackedItem[])
+        .filter((p) => p.id !== packed.id)
+        .map((p) => ({ ...(packedBoxMap.get(p.id) ?? box), position: p.position }))
+      const pos = new THREE.Vector3(packed.position.x, packed.position.y, packed.position.z)
+      const violations = validateStackingConstraints({ ...box, position: packed.position }, pos, others as CargoBox[])
+      if (violations.some((v) => v.severity === 'error')) {
+        constraintUnfit.push(packed.id)
+      }
+    }
+
+    const allUnfit = [...new Set([...unfit, ...constraintUnfit])]
+    const finalPacked = (packedItems as PackedItem[]).filter((p) => !constraintUnfit.includes(p.id))
+    return { packed: finalPacked, unfit: allUnfit }
   } catch (e) {
     console.error('AutoPack failed:', e)
     return { packed: [], unfit: boxes.map((b) => b.id) }

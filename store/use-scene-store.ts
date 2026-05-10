@@ -15,7 +15,18 @@ export interface ContainerSize {
   maxWeight?: number
 }
 
-export interface CargoBox {
+export interface StackingConstraints {
+  fragile?: boolean
+  thisSideUp?: boolean
+  nonStackable?: boolean
+  cannotBeStackedOn?: boolean
+  maxStackWeight?: number
+  hazmat?: string
+  temperature?: 'ambient' | 'chilled' | 'frozen'
+  priority?: 1 | 2 | 3 | 4 | 5
+}
+
+export interface CargoBox extends StackingConstraints {
   id: string
   name: string
   size: BoxSize
@@ -26,7 +37,7 @@ export interface CargoBox {
   orientationId?: 0 | 1 | 2 | 3 | 4 | 5
 }
 
-export interface CatalogItem {
+export interface CatalogItem extends StackingConstraints {
   id: string
   name: string
   size: BoxSize
@@ -64,7 +75,7 @@ export type ViewMode = '3d' | 'top' | 'side'
 export type RenderMode = 'solid' | 'wire' | 'xray'
 export type CameraOp = 'zoom-in' | 'zoom-out' | 'reset'
 
-export interface DragPreview {
+export interface DragPreview extends StackingConstraints {
   catalogItemId: string
   size: BoxSize
   weight: number
@@ -153,6 +164,10 @@ export interface SceneStore {
   flashId: string | null
   setFlashId: (id: string | null) => void
 
+  // Constraint override request (set by CargoBox, consumed by SceneCanvas)
+  overrideRequest: { boxId: string; newPos: { x: number; y: number; z: number }; reason: string } | null
+  setOverrideRequest: (req: { boxId: string; newPos: { x: number; y: number; z: number }; reason: string } | null) => void
+
   // Selection actions
   setSelected: (id: string | null) => void
   toggleSelected: (id: string) => void
@@ -203,6 +218,9 @@ export const SAMPLE_CATALOG: Omit<CargoBox, 'id' | 'position' | 'color'>[] = [
   { name: 'กล่องแบน', size: { w: 120, h: 30, d: 80 }, weight: 8, category: 'Special' },
   { name: 'กล่องสูง', size: { w: 40, h: 120, d: 40 }, weight: 12, category: 'Special' },
   { name: 'กล่องยาว', size: { w: 150, h: 40, d: 40 }, weight: 15, category: 'Special' },
+  { name: 'กล่องไวน์', size: { w: 35, h: 35, d: 35 }, weight: 12, category: 'Beverages', fragile: true, thisSideUp: true, maxStackWeight: 30 },
+  { name: 'อิเล็กทรอนิกส์', size: { w: 60, h: 50, d: 40 }, weight: 25, category: 'Electronics', fragile: true, thisSideUp: true, maxStackWeight: 50 },
+  { name: 'ถังเคมี', size: { w: 50, h: 80, d: 50 }, weight: 100, category: 'Hazmat', hazmat: 'UN1170', cannotBeStackedOn: true, nonStackable: true },
 ]
 
 export const useSceneStore = create<SceneStore>((set, get) => ({
@@ -321,6 +339,9 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
 
   flashId: null,
   setFlashId: (id) => set({ flashId: id }),
+
+  overrideRequest: null,
+  setOverrideRequest: (req) => set({ overrideRequest: req }),
 
   // Selection actions
   setSelected: (id) => set({ selectedIds: id ? new Set([id]) : new Set() }),

@@ -6,6 +6,7 @@ import { useThree, ThreeEvent } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import { useSceneStore, getEffectiveSize } from '@/store/use-scene-store'
 import { validatePlacement, getSupportY } from '@/lib/packing/packing-utils'
+import { ConstraintIcons } from './constraint-icons'
 import type { CargoBox as CargoBoxType } from '@/store/use-scene-store'
 
 interface CargoBoxProps {
@@ -29,6 +30,7 @@ export function CargoBox({ box, onDragStart, onDragEnd }: CargoBoxProps) {
     ghostOpacity,
     renderMode,
     flashId,
+    setOverrideRequest,
   } = useSceneStore()
 
   const isSelected = useSceneStore((s) => s.selectedIds.has(box.id))
@@ -37,6 +39,7 @@ export function CargoBox({ box, onDragStart, onDragEnd }: CargoBoxProps) {
   const isDraggingRef = useRef(false)
   const ghostPosRef = useRef<THREE.Vector3 | null>(null)
   const ghostValidRef = useRef(true)
+  const ghostReasonRef = useRef<string | undefined>(undefined)
   const ghostDeltaRef = useRef<{ delta: THREE.Vector3; valid: boolean } | null>(null)
 
   const [showGhost, setShowGhost] = useState(false)
@@ -137,11 +140,15 @@ export function CargoBox({ box, onDragStart, onDragEnd }: CargoBoxProps) {
           const result = validatePlacement(box, snapped, boxes, containerSize)
           ghostPosRef.current = snapped.clone()
           ghostValidRef.current = result.valid
+          ghostReasonRef.current = result.reason
           ghostDeltaRef.current = null
           setGhostRenderPos(snapped.clone())
           setGhostRenderValid(result.valid)
         }
       }
+
+      const isConstraintViolation = (reason?: string) =>
+        !!reason && reason !== 'กล่องเกินขอบตู้' && !reason.startsWith('ชนกับ')
 
       const onPointerUp = () => {
         document.removeEventListener('pointermove', onPointerMove)
@@ -150,13 +157,23 @@ export function CargoBox({ box, onDragStart, onDragEnd }: CargoBoxProps) {
         if (isDraggingRef.current) {
           if (isMultiSelected && ghostDeltaRef.current?.valid) {
             moveSelected(ghostDeltaRef.current.delta)
-          } else if (!isMultiSelected && ghostPosRef.current && ghostValidRef.current) {
-            moveBox(box.id, ghostPosRef.current)
+          } else if (!isMultiSelected && ghostPosRef.current) {
+            if (ghostValidRef.current) {
+              moveBox(box.id, ghostPosRef.current)
+            } else if (isConstraintViolation(ghostReasonRef.current)) {
+              // Constraint violation — ask user for override instead of silently snapping back
+              setOverrideRequest({
+                boxId: box.id,
+                newPos: { x: ghostPosRef.current.x, y: ghostPosRef.current.y, z: ghostPosRef.current.z },
+                reason: ghostReasonRef.current!,
+              })
+            }
           }
         }
 
         isDraggingRef.current = false
         ghostPosRef.current = null
+        ghostReasonRef.current = undefined
         ghostDeltaRef.current = null
         setShowGhost(false)
         onDragEnd()
@@ -165,7 +182,7 @@ export function CargoBox({ box, onDragStart, onDragEnd }: CargoBoxProps) {
       document.addEventListener('pointermove', onPointerMove)
       document.addEventListener('pointerup', onPointerUp)
     },
-    [box, boxes, camera, containerSize, gridStep, moveBox, moveSelected, setSelected, toggleSelected, getMouseNDC, onDragStart, onDragEnd]
+    [box, boxes, camera, containerSize, gridStep, moveBox, moveSelected, setSelected, setOverrideRequest, toggleSelected, getMouseNDC, onDragStart, onDragEnd]
   )
 
   const effectiveSize = getEffectiveSize(box)
@@ -209,6 +226,15 @@ export function CargoBox({ box, onDragStart, onDragEnd }: CargoBoxProps) {
             <edgesGeometry args={[new THREE.BoxGeometry(...size)]} />
             <lineBasicMaterial color={outlineColor} linewidth={2} />
           </lineSegments>
+        )}
+
+        {!showGhost && <ConstraintIcons box={box} />}
+
+        {box.thisSideUp && !showGhost && (
+          <mesh position={[0, effectiveSize.h / 2 + 4, 0]}>
+            <coneGeometry args={[3, 8, 4]} />
+            <meshBasicMaterial color="#10b981" />
+          </mesh>
         )}
 
         {showTooltip && !showGhost && (
