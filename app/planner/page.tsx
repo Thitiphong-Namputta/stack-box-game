@@ -278,6 +278,7 @@ const STEP_ICONS: Record<StepAction, string> = {
   clearBoxes: "✕",
   undo: "↩",
   redo: "↪",
+  duplicateBoxes: "⧉",
 };
 
 const STEP_COLORS: Record<StepAction, string> = {
@@ -289,6 +290,7 @@ const STEP_COLORS: Record<StepAction, string> = {
   clearBoxes: "text-red-500",
   undo: "an-text-on-surface-muted",
   redo: "an-text-on-surface-muted",
+  duplicateBoxes: "an-text-tertiary",
 };
 
 function StepsTab() {

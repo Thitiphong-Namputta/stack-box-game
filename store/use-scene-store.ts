@@ -43,6 +43,7 @@ export type StepAction =
   | 'clearBoxes'
   | 'undo'
   | 'redo'
+  | 'duplicateBoxes'
 
 export interface StepEntry {
   id: string
@@ -95,7 +96,7 @@ export function getEffectiveSize(box: CargoBox): { w: number; h: number; d: numb
 export interface SceneStore {
   containerSize: ContainerSize
   boxes: CargoBox[]
-  selectedId: string | null
+  selectedIds: Set<string>
   gridStep: number
   ghostOpacity: number
 
@@ -152,9 +153,17 @@ export interface SceneStore {
   flashId: string | null
   setFlashId: (id: string | null) => void
 
+  // Selection actions
+  setSelected: (id: string | null) => void
+  toggleSelected: (id: string) => void
+  addToSelection: (ids: string[]) => void
+  removeFromSelection: (ids: string[]) => void
+  selectAll: () => void
+  clearSelection: () => void
+  isSelected: (id: string) => boolean
+
   // Box actions
   setContainerSize: (size: ContainerSize) => void
-  setSelected: (id: string | null) => void
   moveBox: (id: string, position: THREE.Vector3) => void
   addBox: (box: CargoBox) => void
   removeBox: (id: string) => void
@@ -163,6 +172,14 @@ export interface SceneStore {
   setGhostOpacity: (opacity: number) => void
   clearBoxes: () => void
   moveAllBoxes: (positions: { id: string; position: { x: number; y: number; z: number } }[]) => void
+
+  // Bulk actions
+  removeSelected: () => void
+  duplicateSelected: () => void
+  rotateSelected: (dir: 'fwd' | 'bwd') => void
+  moveSelected: (delta: { x: number; y: number; z: number }) => void
+  alignSelected: (axis: 'x' | 'y' | 'z', mode: 'min' | 'center' | 'max') => void
+  distributeSelected: (axis: 'x' | 'y' | 'z') => void
 }
 
 const BOX_COLORS = [
@@ -191,7 +208,7 @@ export const SAMPLE_CATALOG: Omit<CargoBox, 'id' | 'position' | 'color'>[] = [
 export const useSceneStore = create<SceneStore>((set, get) => ({
   containerSize: { w: 600, h: 240, d: 240, maxWeight: 20000 },
   boxes: [],
-  selectedId: null,
+  selectedIds: new Set(),
   gridStep: 10,
   ghostOpacity: 0.4,
 
@@ -221,11 +238,12 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
     set((state) => {
       if (state.history.length === 0) return {}
       const prev = state.history[state.history.length - 1]
+      const prevIds = new Set(prev.map((b) => b.id))
       return {
         history: state.history.slice(0, -1),
         future: [state.boxes, ...state.future].slice(0, 20),
         boxes: prev,
-        selectedId: prev.some((b) => b.id === state.selectedId) ? state.selectedId : null,
+        selectedIds: new Set([...state.selectedIds].filter((id) => prevIds.has(id))),
       }
     })
     get().logStep('undo', 'Undo')
@@ -235,11 +253,12 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
     set((state) => {
       if (state.future.length === 0) return {}
       const next = state.future[0]
+      const nextIds = new Set(next.map((b) => b.id))
       return {
         future: state.future.slice(1),
         history: [...state.history, state.boxes].slice(-20),
         boxes: next,
-        selectedId: next.some((b) => b.id === state.selectedId) ? state.selectedId : null,
+        selectedIds: new Set([...state.selectedIds].filter((id) => nextIds.has(id))),
       }
     })
     get().logStep('redo', 'Redo')
@@ -290,7 +309,7 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
     set(() => ({
       boxes: plan.boxes,
       containerSize: plan.containerSize,
-      selectedId: null,
+      selectedIds: new Set(),
       history: [],
       future: [],
       unfitIds: [],
@@ -303,9 +322,40 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
   flashId: null,
   setFlashId: (id) => set({ flashId: id }),
 
+  // Selection actions
+  setSelected: (id) => set({ selectedIds: id ? new Set([id]) : new Set() }),
+
+  toggleSelected: (id) =>
+    set((state) => {
+      const next = new Set(state.selectedIds)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return { selectedIds: next }
+    }),
+
+  addToSelection: (ids) =>
+    set((state) => {
+      const next = new Set(state.selectedIds)
+      ids.forEach((id) => next.add(id))
+      return { selectedIds: next }
+    }),
+
+  removeFromSelection: (ids) =>
+    set((state) => {
+      const next = new Set(state.selectedIds)
+      ids.forEach((id) => next.delete(id))
+      return { selectedIds: next }
+    }),
+
+  selectAll: () =>
+    set((state) => ({ selectedIds: new Set(state.boxes.map((b) => b.id)) })),
+
+  clearSelection: () => set({ selectedIds: new Set() }),
+
+  isSelected: (id) => get().selectedIds.has(id),
+
   // Box actions
   setContainerSize: (size) => set({ containerSize: size }),
-  setSelected: (id) => set({ selectedId: id }),
 
   addBox: (box) => {
     set((state) => ({
@@ -318,12 +368,16 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
 
   removeBox: (id) => {
     const name = get().boxes.find((b) => b.id === id)?.name ?? id
-    set((state) => ({
-      history: [...state.history.slice(-19), state.boxes],
-      future: [],
-      boxes: state.boxes.filter((b) => b.id !== id),
-      selectedId: state.selectedId === id ? null : state.selectedId,
-    }))
+    set((state) => {
+      const next = new Set(state.selectedIds)
+      next.delete(id)
+      return {
+        history: [...state.history.slice(-19), state.boxes],
+        future: [],
+        boxes: state.boxes.filter((b) => b.id !== id),
+        selectedIds: next,
+      }
+    })
     get().logStep('removeBox', `Removed ${name}`)
   },
 
@@ -362,7 +416,7 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
       history: [...state.history.slice(-19), state.boxes],
       future: [],
       boxes: [],
-      selectedId: null,
+      selectedIds: new Set(),
     }))
     get().logStep('clearBoxes', 'Cleared all boxes')
   },
@@ -376,7 +430,150 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
         return found ? { ...b, position: found.position } : b
       }),
     })),
+
+  // ── Bulk actions ───────────────────────────────────────────────────
+
+  removeSelected: () => {
+    const ids = Array.from(get().selectedIds)
+    if (ids.length === 0) return
+    set((state) => ({
+      history: [...state.history.slice(-19), state.boxes],
+      future: [],
+      boxes: state.boxes.filter((b) => !state.selectedIds.has(b.id)),
+      selectedIds: new Set(),
+    }))
+    get().logStep('removeBox', `Removed ${ids.length} box${ids.length > 1 ? 'es' : ''}`)
+  },
+
+  duplicateSelected: () => {
+    const state = get()
+    const selected = state.boxes.filter((b) => state.selectedIds.has(b.id))
+    if (selected.length === 0) return
+    const offset = state.gridStep * 2
+    const newBoxes = selected.map((b) => ({
+      ...b,
+      id: nanoid(8),
+      position: {
+        x: Math.min(b.position.x + offset, state.containerSize.w - getEffectiveSize(b).w / 2),
+        y: b.position.y,
+        z: Math.min(b.position.z + offset, state.containerSize.d - getEffectiveSize(b).d / 2),
+      },
+    }))
+    set((s) => ({
+      history: [...s.history.slice(-19), s.boxes],
+      future: [],
+      boxes: [...s.boxes, ...newBoxes],
+      selectedIds: new Set(newBoxes.map((b) => b.id)),
+    }))
+    get().logStep('addBox', `Duplicated ${selected.length} box${selected.length > 1 ? 'es' : ''}`)
+  },
+
+  rotateSelected: (dir) => {
+    const state = get()
+    const ids = Array.from(state.selectedIds)
+    if (ids.length === 0) return
+    set((s) => ({
+      history: [...s.history.slice(-19), s.boxes],
+      future: [],
+      boxes: s.boxes.map((b) => {
+        if (!s.selectedIds.has(b.id)) return b
+        const current = b.orientationId ?? 0
+        const next = (dir === 'fwd' ? current + 1 : current + 5) % 6
+        return { ...b, orientationId: next as 0 | 1 | 2 | 3 | 4 | 5 }
+      }),
+    }))
+    get().logStep('rotateBox', `Rotated ${ids.length} box${ids.length > 1 ? 'es' : ''}`)
+  },
+
+  moveSelected: (delta) => {
+    const state = get()
+    if (state.selectedIds.size === 0) return
+    set((s) => ({
+      history: [...s.history.slice(-19), s.boxes],
+      future: [],
+      boxes: s.boxes.map((b) =>
+        s.selectedIds.has(b.id)
+          ? {
+              ...b,
+              position: {
+                x: b.position.x + delta.x,
+                y: b.position.y + delta.y,
+                z: b.position.z + delta.z,
+              },
+            }
+          : b
+      ),
+    }))
+    get().logStep('moveBox', `Moved ${state.selectedIds.size} box${state.selectedIds.size > 1 ? 'es' : ''}`)
+  },
+
+  alignSelected: (axis, mode) => {
+    const state = get()
+    const selected = state.boxes.filter((b) => state.selectedIds.has(b.id))
+    if (selected.length < 2) return
+
+    const halfSize = (b: CargoBox): number => {
+      const e = getEffectiveSize(b)
+      return axis === 'x' ? e.w / 2 : axis === 'y' ? e.h / 2 : e.d / 2
+    }
+
+    let target: number
+    if (mode === 'min') {
+      target = Math.min(...selected.map((b) => b.position[axis] - halfSize(b)))
+    } else if (mode === 'max') {
+      target = Math.max(...selected.map((b) => b.position[axis] + halfSize(b)))
+    } else {
+      target = selected.reduce((s, b) => s + b.position[axis], 0) / selected.length
+    }
+
+    const updates = new Map<string, number>()
+    selected.forEach((b) => {
+      const half = halfSize(b)
+      if (mode === 'min') updates.set(b.id, target + half)
+      else if (mode === 'max') updates.set(b.id, target - half)
+      else updates.set(b.id, target)
+    })
+
+    set((s) => ({
+      history: [...s.history.slice(-19), s.boxes],
+      future: [],
+      boxes: s.boxes.map((b) => {
+        const newCoord = updates.get(b.id)
+        if (newCoord === undefined) return b
+        return { ...b, position: { ...b.position, [axis]: newCoord } }
+      }),
+    }))
+    get().logStep('moveBox', `Aligned ${selected.length} boxes on ${axis}`)
+  },
+
+  distributeSelected: (axis) => {
+    const state = get()
+    const selected = state.boxes.filter((b) => state.selectedIds.has(b.id))
+    if (selected.length < 3) return
+
+    const sorted = [...selected].sort((a, b) => a.position[axis] - b.position[axis])
+    const first = sorted[0].position[axis]
+    const last = sorted[sorted.length - 1].position[axis]
+    const step = (last - first) / (sorted.length - 1)
+
+    set((s) => ({
+      history: [...s.history.slice(-19), s.boxes],
+      future: [],
+      boxes: s.boxes.map((b) => {
+        const idx = sorted.findIndex((sb) => sb.id === b.id)
+        if (idx <= 0 || idx >= sorted.length - 1) return b
+        return { ...b, position: { ...b.position, [axis]: first + step * idx } }
+      }),
+    }))
+    get().logStep('moveBox', `Distributed ${selected.length} boxes on ${axis}`)
+  },
 }))
+
+// ── Selection helpers ───────────────────────────────────────────────────
+
+/** Returns the first selected id (or null) — for components that only need single-select compat */
+export const selectedIdSelector = (s: SceneStore): string | null =>
+  s.selectedIds.size === 0 ? null : Array.from(s.selectedIds)[0]
 
 // ── localStorage helpers ────────────────────────────────────────────────
 

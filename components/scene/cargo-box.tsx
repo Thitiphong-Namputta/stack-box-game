@@ -19,9 +19,10 @@ const snapToGrid = (v: number, step: number) => Math.round(v / step) * step
 export function CargoBox({ box, onDragStart, onDragEnd }: CargoBoxProps) {
   const { camera, gl } = useThree()
   const {
-    selectedId,
     setSelected,
+    toggleSelected,
     moveBox,
+    moveSelected,
     boxes,
     containerSize,
     gridStep,
@@ -30,12 +31,13 @@ export function CargoBox({ box, onDragStart, onDragEnd }: CargoBoxProps) {
     flashId,
   } = useSceneStore()
 
-  const isSelected = selectedId === box.id
+  const isSelected = useSceneStore((s) => s.selectedIds.has(box.id))
   const isFlashing = flashId === box.id
 
   const isDraggingRef = useRef(false)
   const ghostPosRef = useRef<THREE.Vector3 | null>(null)
   const ghostValidRef = useRef(true)
+  const ghostDeltaRef = useRef<{ delta: THREE.Vector3; valid: boolean } | null>(null)
 
   const [showGhost, setShowGhost] = useState(false)
   const [ghostRenderPos, setGhostRenderPos] = useState<THREE.Vector3>(
@@ -58,11 +60,24 @@ export function CargoBox({ box, onDragStart, onDragEnd }: CargoBoxProps) {
   const handlePointerDown = useCallback(
     (e: ThreeEvent<PointerEvent>) => {
       e.stopPropagation()
-      setSelected(box.id)
+
+      const isShift = e.nativeEvent.shiftKey
+      const isMod = e.nativeEvent.ctrlKey || e.nativeEvent.metaKey
+
+      if (isShift || isMod) {
+        toggleSelected(box.id)
+        return
+      }
+
+      const storeState = useSceneStore.getState()
+      const isMultiSelected = storeState.selectedIds.size > 1 && storeState.selectedIds.has(box.id)
+
+      // Click on unselected box → replace selection
+      if (!storeState.selectedIds.has(box.id)) {
+        setSelected(box.id)
+      }
 
       const effectiveSize = getEffectiveSize(box)
-
-      // Floor-level plane to get X,Z from mouse — Y computed separately via getSupportY
       const dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
       const raycaster = new THREE.Raycaster()
 
@@ -79,7 +94,6 @@ export function CargoBox({ box, onDragStart, onDragEnd }: CargoBoxProps) {
         const intersection = new THREE.Vector3()
         if (!raycaster.ray.intersectPlane(dragPlane, intersection)) return
 
-        // Snap X,Z to grid and clamp inside container using effective size
         const clampedX = Math.max(
           effectiveSize.w / 2,
           Math.min(containerSize.w - effectiveSize.w / 2, snapToGrid(intersection.x, gridStep))
@@ -89,28 +103,61 @@ export function CargoBox({ box, onDragStart, onDragEnd }: CargoBoxProps) {
           Math.min(containerSize.d - effectiveSize.d / 2, snapToGrid(intersection.z, gridStep))
         )
 
-        // Auto-gravity: compute Y from support surface at (clampedX, clampedZ)
         const snapY = getSupportY(clampedX, clampedZ, box, boxes, containerSize)
         const snapped = new THREE.Vector3(clampedX, snapY, clampedZ)
 
-        const result = validatePlacement(box, snapped, boxes, containerSize)
+        if (isMultiSelected) {
+          // Group drag: compute delta and validate all selected boxes
+          const delta = new THREE.Vector3(
+            snapped.x - box.position.x,
+            snapped.y - box.position.y,
+            snapped.z - box.position.z
+          )
+          const currentBoxes = useSceneStore.getState().boxes
+          const currentSelectedIds = useSceneStore.getState().selectedIds
+          const selectedBoxes = currentBoxes.filter((b) => currentSelectedIds.has(b.id))
+          const others = currentBoxes.filter((b) => !currentSelectedIds.has(b.id))
 
-        ghostPosRef.current = snapped.clone()
-        ghostValidRef.current = result.valid
-        setGhostRenderPos(snapped.clone())
-        setGhostRenderValid(result.valid)
+          const allValid = selectedBoxes.every((b) => {
+            const newPos = new THREE.Vector3(
+              b.position.x + delta.x,
+              b.position.y + delta.y,
+              b.position.z + delta.z
+            )
+            return validatePlacement(b, newPos, others, containerSize).valid
+          })
+
+          ghostDeltaRef.current = { delta, valid: allValid }
+          ghostPosRef.current = snapped.clone()
+          ghostValidRef.current = allValid
+          setGhostRenderPos(snapped.clone())
+          setGhostRenderValid(allValid)
+        } else {
+          // Single drag
+          const result = validatePlacement(box, snapped, boxes, containerSize)
+          ghostPosRef.current = snapped.clone()
+          ghostValidRef.current = result.valid
+          ghostDeltaRef.current = null
+          setGhostRenderPos(snapped.clone())
+          setGhostRenderValid(result.valid)
+        }
       }
 
       const onPointerUp = () => {
         document.removeEventListener('pointermove', onPointerMove)
         document.removeEventListener('pointerup', onPointerUp)
 
-        if (isDraggingRef.current && ghostPosRef.current && ghostValidRef.current) {
-          moveBox(box.id, ghostPosRef.current)
+        if (isDraggingRef.current) {
+          if (isMultiSelected && ghostDeltaRef.current?.valid) {
+            moveSelected(ghostDeltaRef.current.delta)
+          } else if (!isMultiSelected && ghostPosRef.current && ghostValidRef.current) {
+            moveBox(box.id, ghostPosRef.current)
+          }
         }
 
         isDraggingRef.current = false
         ghostPosRef.current = null
+        ghostDeltaRef.current = null
         setShowGhost(false)
         onDragEnd()
       }
@@ -118,14 +165,13 @@ export function CargoBox({ box, onDragStart, onDragEnd }: CargoBoxProps) {
       document.addEventListener('pointermove', onPointerMove)
       document.addEventListener('pointerup', onPointerUp)
     },
-    [box, boxes, camera, containerSize, gridStep, moveBox, setSelected, getMouseNDC, onDragStart, onDragEnd]
+    [box, boxes, camera, containerSize, gridStep, moveBox, moveSelected, setSelected, toggleSelected, getMouseNDC, onDragStart, onDragEnd]
   )
 
   const effectiveSize = getEffectiveSize(box)
   const position: [number, number, number] = [box.position.x, box.position.y, box.position.z]
   const size: [number, number, number] = [effectiveSize.w, effectiveSize.h, effectiveSize.d]
 
-  // Outline color: red flash > selected white > none
   const outlineColor = isFlashing ? '#ef4444' : '#ffffff'
   const showOutline = isSelected || isFlashing
 

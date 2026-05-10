@@ -3,12 +3,13 @@
 import { useMemo, useState } from 'react'
 import * as THREE from 'three'
 import { CheckCircle2, XCircle, Download, AlertTriangle, RotateCcw, RotateCw, FileText, Sheet, Loader2 } from 'lucide-react'
-import { useSceneStore, getEffectiveSize } from '@/store/use-scene-store'
+import { useSceneStore, getEffectiveSize, selectedIdSelector } from '@/store/use-scene-store'
 import { useBinPacking } from '@/lib/packing/use-bin-packing'
 import { validatePlacement } from '@/lib/packing/packing-utils'
 import { exportPDF, exportXLSX } from '@/lib/api-client'
 import type { CargoBox } from '@/store/use-scene-store'
 import { StabilityPanel } from './stability-panel'
+import { MultiSelectPanel } from './multi-select-panel'
 
 // ── helpers ─────────────────────────────────────────────────────────
 
@@ -107,7 +108,9 @@ function UtilizationBar({
 // ── RightPanel ───────────────────────────────────────────────────────
 
 export function RightPanel() {
-  const { boxes, selectedId, containerSize, unfitIds, rotateBox, setFlashId, activePlanId, activePlanName } = useSceneStore()
+  const { boxes, containerSize, unfitIds, rotateBox, setFlashId, activePlanId, activePlanName } = useSceneStore()
+  const selectedId = useSceneStore(selectedIdSelector)
+  const selectedCount = useSceneStore((s) => s.selectedIds.size)
   const { spaceUtilization } = useBinPacking()
   const [pdfLoading, setPdfLoading] = useState(false)
   const [xlsxLoading, setXlsxLoading] = useState(false)
@@ -257,7 +260,10 @@ export function RightPanel() {
         </div>
       </section>
 
-      {/* Selected Item Details */}
+      {/* Selected Item Details — switches between single / multi / empty */}
+      {selectedCount > 1 ? (
+        <MultiSelectPanel />
+      ) : (
       <section className="flex-1 p-6 overflow-y-auto">
         <SectionLabel>
           {selected ? `Selection: ${selected.name}` : 'Selection'}
@@ -371,6 +377,7 @@ export function RightPanel() {
           </div>
         </div>
       </section>
+      )}
     </aside>
   )
 }

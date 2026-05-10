@@ -24,8 +24,8 @@ function getBlankDragImage() {
 
 // ── ManifestItemCard ────────────────────────────────────────────────
 function ManifestItemCard({ box }: { box: CargoBox }) {
-  const { selectedId, setSelected, removeBox, unfitIds } = useSceneStore()
-  const isSelected = selectedId === box.id
+  const { setSelected, removeBox, unfitIds } = useSceneStore()
+  const isSelected = useSceneStore((s) => s.selectedIds.has(box.id))
   const isUnfit = unfitIds.includes(box.id)
 
   return (
