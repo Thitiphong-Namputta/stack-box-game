@@ -1,6 +1,8 @@
 import ExcelJS from 'exceljs'
 import { auth } from '@/auth'
 import type { ReportData } from '@/components/pdf/report-document'
+import { computeCoG } from '@/lib/physics/center-of-gravity'
+import { computeStability } from '@/lib/physics/stability'
 
 export async function POST(req: Request) {
   const session = await auth()
@@ -9,6 +11,8 @@ export async function POST(req: Request) {
   }
 
   const { plan, containerSize, boxes }: ReportData = await req.json()
+  const cog = computeCoG(boxes, containerSize)
+  const stab = cog ? computeStability(cog, boxes, containerSize) : null
 
   const workbook = new ExcelJS.Workbook()
   workbook.creator = 'Stack Box'
@@ -115,6 +119,63 @@ export async function POST(req: Request) {
     cell.font = { bold: true }
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } }
   })
+
+  // ── Sheet 3: Stability ─────────────────────────────────────────
+  if (stab && cog) {
+    const stability = workbook.addWorksheet('Stability')
+    stability.columns = [
+      { key: 'label', width: 32 },
+      { key: 'value', width: 24 },
+    ]
+
+    const stabTitle = stability.getCell('A1')
+    stabTitle.value = 'Stability Analysis'
+    stabTitle.font = { bold: true, size: 14, color: { argb: 'FF1E3A8A' } }
+    stability.mergeCells('A1:B1')
+
+    const stabData: [string, string | number][] = [
+      ['Stability Score', `${stab.score.toFixed(0)} / 100`],
+      ['ระดับ (Level)', stab.level.toUpperCase()],
+      ['CoG X (cm)', +cog.cog.x.toFixed(1)],
+      ['CoG Y (cm)', +cog.cog.y.toFixed(1)],
+      ['CoG Z (cm)', +cog.cog.z.toFixed(1)],
+      ['CoG Height (%)', `${stab.cogHeightPct.toFixed(0)}%`],
+      ['Deviation X (%)', `${cog.deviation.pctX.toFixed(1)}%`],
+      ['Deviation Z (%)', `${cog.deviation.pctZ.toFixed(1)}%`],
+      ['Front Axle Weight (kg)', +stab.axleDistribution.front.weight.toFixed(0)],
+      ['Rear Axle Weight (kg)', +stab.axleDistribution.rear.weight.toFixed(0)],
+      ['Front/Rear Distribution', `${stab.axleDistribution.front.pct.toFixed(0)}% / ${stab.axleDistribution.rear.pct.toFixed(0)}%`],
+      ['Balance', stab.axleDistribution.balanced ? 'สมดุล' : 'ไม่สมดุล'],
+    ]
+
+    stabData.forEach(([label, value], i) => {
+      const row = 3 + i
+      const labelCell = stability.getCell(`A${row}`)
+      const valueCell = stability.getCell(`B${row}`)
+      labelCell.value = label
+      labelCell.font = { bold: true, size: 10 }
+      labelCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } }
+      labelCell.border = { bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } } }
+      valueCell.value = value
+      valueCell.font = { size: 10 }
+      valueCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } }
+      valueCell.border = { bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } } }
+    })
+
+    if (stab.warnings.length > 0) {
+      const warnStart = 3 + stabData.length + 1
+      const warnHeader = stability.getCell(`A${warnStart}`)
+      warnHeader.value = 'Stability Warnings'
+      warnHeader.font = { bold: true, color: { argb: 'FF991B1B' }, size: 10 }
+
+      stab.warnings.forEach((w, i) => {
+        const warnCell = stability.getCell(`A${warnStart + 1 + i}`)
+        warnCell.value = `⚠ ${w}`
+        warnCell.font = { color: { argb: 'FF991B1B' }, size: 10 }
+        stability.mergeCells(`A${warnStart + 1 + i}:B${warnStart + 1 + i}`)
+      })
+    }
+  }
 
   // ── Export ──────────────────────────────────────────────────────
   const buffer = await workbook.xlsx.writeBuffer()

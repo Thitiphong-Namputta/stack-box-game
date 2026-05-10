@@ -10,6 +10,7 @@ import { validatePlacement, getSupportY } from '@/lib/packing/packing-utils'
 import { CargoContainer } from './cargo-container'
 import { CargoBox } from './cargo-box'
 import { CatalogDropPreview } from './catalog-drop-preview'
+import { CoGMarker } from './cog-marker'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import type { CargoBox as CargoBoxType } from '@/store/use-scene-store'
 
@@ -319,6 +320,7 @@ export function SceneCanvas() {
 
         {/* Catalog drop ghost */}
         <CatalogDropPreview />
+        <CoGMarker />
 
         {/* Imperative camera controller */}
         <CameraController orbitRef={orbitRef} />

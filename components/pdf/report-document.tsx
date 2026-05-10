@@ -1,6 +1,8 @@
 import path from 'path'
 import { Document, Page, View, Text, Font } from '@react-pdf/renderer'
 import type { CargoBox, ContainerSize } from '@/store/use-scene-store'
+import type { CoGResult } from '@/lib/physics/center-of-gravity'
+import type { StabilityResult } from '@/lib/physics/stability'
 import { styles } from './styles'
 
 Font.register({
@@ -15,6 +17,9 @@ export interface ReportData {
   plan: { id: string | null; name: string | null }
   containerSize: ContainerSize
   boxes: CargoBox[]
+  generatedAt: number
+  cog?: CoGResult | null
+  stab?: StabilityResult | null
 }
 
 function formatDate(ts: number) {
@@ -28,12 +33,12 @@ function formatDate(ts: number) {
 }
 
 export function ReportDocument({ data }: { data: ReportData }) {
-  const { plan, containerSize, boxes } = data
+  const { plan, containerSize, boxes, generatedAt, cog, stab } = data
   const totalVol = containerSize.w * containerSize.h * containerSize.d
   const usedVol = boxes.reduce((s, b) => s + b.size.w * b.size.h * b.size.d, 0)
   const utilization = totalVol > 0 ? Math.round((usedVol / totalVol) * 100) : 0
   const totalWeight = boxes.reduce((s, b) => s + (b.weight ?? 0), 0)
-  const now = Date.now()
+  const now = generatedAt
 
   return (
     <Document title={`Cargo Report: ${plan.name ?? 'Unnamed'}`} author="Stack Box">
@@ -115,6 +120,52 @@ export function ReportDocument({ data }: { data: ReportData }) {
             })}
           </View>
         </View>
+
+        {/* Stability Analysis */}
+        {stab && cog && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>การวิเคราะห์ความสมดุล (Stability)</Text>
+            <View style={styles.summaryGrid}>
+              <View style={styles.summaryCard}>
+                <Text style={styles.summaryLabel}>Stability Score</Text>
+                <Text style={styles.summaryValue}>{stab.score.toFixed(0)} / 100</Text>
+              </View>
+              <View style={styles.summaryCard}>
+                <Text style={styles.summaryLabel}>ระดับ</Text>
+                <Text style={styles.summaryValue}>{stab.level.toUpperCase()}</Text>
+              </View>
+              <View style={styles.summaryCard}>
+                <Text style={styles.summaryLabel}>CoG Position (cm)</Text>
+                <Text style={styles.summaryValue}>
+                  ({cog.cog.x.toFixed(0)}, {cog.cog.y.toFixed(0)}, {cog.cog.z.toFixed(0)})
+                </Text>
+              </View>
+              <View style={styles.summaryCard}>
+                <Text style={styles.summaryLabel}>CoG Height</Text>
+                <Text style={styles.summaryValue}>{stab.cogHeightPct.toFixed(0)}%</Text>
+              </View>
+              <View style={styles.summaryCard}>
+                <Text style={styles.summaryLabel}>Front/Rear Distribution</Text>
+                <Text style={styles.summaryValue}>
+                  {stab.axleDistribution.front.pct.toFixed(0)}% / {stab.axleDistribution.rear.pct.toFixed(0)}%
+                </Text>
+              </View>
+              <View style={styles.summaryCard}>
+                <Text style={styles.summaryLabel}>Balance</Text>
+                <Text style={styles.summaryValue}>{stab.axleDistribution.balanced ? 'สมดุล' : 'ไม่สมดุล'}</Text>
+              </View>
+            </View>
+            {stab.warnings.length > 0 && (
+              <View style={{ marginTop: 8, padding: 8, backgroundColor: '#fef2f2', borderRadius: 4 }}>
+                {stab.warnings.map((w, i) => (
+                  <Text key={i} style={{ fontSize: 9, color: '#991b1b', fontFamily: 'Prompt' }}>
+                    ⚠ {w}
+                  </Text>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Footer */}
         <View style={styles.footer} fixed>

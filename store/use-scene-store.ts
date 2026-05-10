@@ -144,6 +144,10 @@ export interface SceneStore {
   setDragPreview: (preview: DragPreview | null) => void
   updateDragPreviewPosition: (pos: { x: number; y: number; z: number } | null, isValid: boolean) => void
 
+  // CoG visibility
+  showCoG: boolean
+  toggleCoG: () => void
+
   // Flash invalid feedback
   flashId: string | null
   setFlashId: (id: string | null) => void
@@ -293,6 +297,9 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
     })),
 
   // Flash invalid feedback
+  showCoG: true,
+  toggleCoG: () => set((s) => ({ showCoG: !s.showCoG })),
+
   flashId: null,
   setFlashId: (id) => set({ flashId: id }),
 

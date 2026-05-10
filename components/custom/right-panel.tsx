@@ -8,6 +8,7 @@ import { useBinPacking } from '@/lib/packing/use-bin-packing'
 import { validatePlacement } from '@/lib/packing/packing-utils'
 import { exportPDF, exportXLSX } from '@/lib/api-client'
 import type { CargoBox } from '@/store/use-scene-store'
+import { StabilityPanel } from './stability-panel'
 
 // ── helpers ─────────────────────────────────────────────────────────
 
@@ -205,6 +206,9 @@ export function RightPanel() {
           />
         </div>
       </section>
+
+      {/* Stability Analysis */}
+      <StabilityPanel />
 
       {/* Unfit items warning */}
       {unfitIds.length > 0 && (
