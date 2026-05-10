@@ -2,13 +2,16 @@
 
 import { useRef, useState, useCallback, useEffect } from 'react'
 import * as THREE from 'three'
-import { Canvas } from '@react-three/fiber'
+import { Canvas, useThree } from '@react-three/fiber'
 import { OrbitControls, Grid } from '@react-three/drei'
+import { nanoid } from 'nanoid'
 import { useSceneStore } from '@/store/use-scene-store'
-import { validatePlacement } from '@/lib/packing/packing-utils'
+import { validatePlacement, getSupportY } from '@/lib/packing/packing-utils'
 import { CargoContainer } from './cargo-container'
 import { CargoBox } from './cargo-box'
+import { CatalogDropPreview } from './catalog-drop-preview'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
+import type { CargoBox as CargoBoxType } from '@/store/use-scene-store'
 
 // ── CameraController ───────────────────────────────────────────────────
 function CameraController({
@@ -63,6 +66,13 @@ function CameraController({
   return null
 }
 
+// Exposes the R3F camera to a ref outside the Canvas
+function CameraGrabber({ onReady }: { onReady: (cam: THREE.Camera) => void }) {
+  const { camera } = useThree()
+  useEffect(() => onReady(camera), [camera, onReady])
+  return null
+}
+
 // ── SceneCanvas ────────────────────────────────────────────────────────
 export function SceneCanvas() {
   const {
@@ -77,8 +87,14 @@ export function SceneCanvas() {
     undo,
     redo,
     setFlashId,
+    dragPreview,
+    setDragPreview,
+    updateDragPreviewPosition,
+    addBox,
   } = useSceneStore()
   const orbitRef = useRef<OrbitControlsImpl>(null)
+  const canvasWrapperRef = useRef<HTMLDivElement>(null)
+  const cameraRef = useRef<THREE.Camera | null>(null)
   const [isDragging, setIsDragging] = useState(false)
 
   // Keyboard shortcuts
@@ -94,8 +110,12 @@ export function SceneCanvas() {
       if (isMod && !e.shiftKey && e.key === 'z') { e.preventDefault(); undo(); return }
       if (isMod && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) { e.preventDefault(); redo(); return }
 
-      // Escape — deselect
-      if (e.key === 'Escape') { setSelected(null); return }
+      // Escape — deselect or cancel drag preview
+      if (e.key === 'Escape') {
+        setDragPreview(null)
+        setSelected(null)
+        return
+      }
 
       // Everything below requires a selected box
       const box = selectedId ? boxes.find((b) => b.id === selectedId) : null
@@ -152,86 +172,171 @@ export function SceneCanvas() {
 
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [boxes, containerSize, gridStep, selectedId, setSelected, moveBox, removeBox, rotateBox, undo, redo, setFlashId])
+  }, [boxes, containerSize, gridStep, selectedId, setSelected, moveBox, removeBox, rotateBox, undo, redo, setFlashId, setDragPreview])
 
-  const handleDragStart = useCallback(() => {
+  // Cancel drag preview when window loses focus
+  useEffect(() => {
+    const onBlur = () => setDragPreview(null)
+    window.addEventListener('blur', onBlur)
+    return () => window.removeEventListener('blur', onBlur)
+  }, [setDragPreview])
+
+  const handleBoxDragStart = useCallback(() => {
     setIsDragging(true)
     if (orbitRef.current) orbitRef.current.enabled = false
   }, [])
 
-  const handleDragEnd = useCallback(() => {
+  const handleBoxDragEnd = useCallback(() => {
     setIsDragging(false)
     if (orbitRef.current) orbitRef.current.enabled = true
   }, [])
+
+  // ── Catalog drag handlers ────────────────────────────────────────────
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'copy'
+    if (!dragPreview || !canvasWrapperRef.current || !cameraRef.current) return
+
+    const rect = canvasWrapperRef.current.getBoundingClientRect()
+    const ndc = new THREE.Vector2(
+      ((e.clientX - rect.left) / rect.width) * 2 - 1,
+      -((e.clientY - rect.top) / rect.height) * 2 + 1
+    )
+
+    const raycaster = new THREE.Raycaster()
+    raycaster.setFromCamera(ndc, cameraRef.current)
+    const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
+    const hit = new THREE.Vector3()
+    if (!raycaster.ray.intersectPlane(floorPlane, hit)) return
+
+    const s = dragPreview.size
+    const snap = (v: number) => Math.round(v / gridStep) * gridStep
+    const clampedX = Math.max(s.w / 2, Math.min(containerSize.w - s.w / 2, snap(hit.x)))
+    const clampedZ = Math.max(s.d / 2, Math.min(containerSize.d - s.d / 2, snap(hit.z)))
+
+    const tempBox: CargoBoxType = {
+      id: '__preview__',
+      name: dragPreview.name,
+      size: dragPreview.size,
+      weight: dragPreview.weight,
+      color: dragPreview.color,
+      orientationId: 0,
+      position: { x: 0, y: 0, z: 0 },
+    }
+
+    const y = getSupportY(clampedX, clampedZ, tempBox, boxes, containerSize)
+    const candidate = new THREE.Vector3(clampedX, y, clampedZ)
+    const result = validatePlacement(tempBox, candidate, boxes, containerSize)
+
+    updateDragPreviewPosition({ x: candidate.x, y: candidate.y, z: candidate.z }, result.valid)
+  }, [dragPreview, boxes, containerSize, gridStep, updateDragPreviewPosition])
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    if (!dragPreview?.position || !dragPreview.isValid) {
+      setDragPreview(null)
+      return
+    }
+    addBox({
+      id: nanoid(),
+      name: dragPreview.name,
+      size: dragPreview.size,
+      weight: dragPreview.weight,
+      color: dragPreview.color,
+      category: dragPreview.category,
+      orientationId: 0,
+      position: dragPreview.position,
+    })
+    setDragPreview(null)
+  }, [dragPreview, addBox, setDragPreview])
+
+  const handleDragLeave = useCallback(() => {
+    updateDragPreviewPosition(null, false)
+  }, [updateDragPreviewPosition])
 
   const centerX = containerSize.w / 2
   const centerZ = containerSize.d / 2
 
   return (
-    <Canvas
-      shadows={{ type: THREE.PCFShadowMap }}
-      camera={{
-        position: [containerSize.w * 1.2, containerSize.h * 1.5, containerSize.d * 1.5],
-        fov: 50,
-        near: 1,
-        far: 10000,
-      }}
-      onPointerMissed={() => setSelected(null)}
+    <div
+      ref={canvasWrapperRef}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+      onDragLeave={handleDragLeave}
       className="w-full h-full"
     >
-      {/* Lighting */}
-      <ambientLight intensity={0.8} />
-      <directionalLight
-        position={[containerSize.w, containerSize.h * 2, containerSize.d]}
-        intensity={1.2}
-        castShadow
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
-      />
-      <directionalLight position={[-200, 300, -200]} intensity={0.4} />
-      <hemisphereLight args={['#334155', '#0f172a', 0.5]} />
-
-      {/* Grid */}
-      <Grid
-        position={[centerX, 0, centerZ]}
-        args={[containerSize.w + 200, containerSize.d + 200]}
-        cellSize={containerSize.w / 10}
-        cellThickness={0.5}
-        cellColor="#334155"
-        sectionSize={containerSize.w / 2}
-        sectionThickness={1}
-        sectionColor="#475569"
-        fadeDistance={2000}
-        fadeStrength={1}
-        infiniteGrid={false}
-      />
-
-      {/* Cargo Container */}
-      <CargoContainer />
-
-      {/* Boxes */}
-      {boxes.map((box) => (
-        <CargoBox
-          key={box.id}
-          box={box}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
+      <Canvas
+        shadows={{ type: THREE.PCFShadowMap }}
+        camera={{
+          position: [containerSize.w * 1.2, containerSize.h * 1.5, containerSize.d * 1.5],
+          fov: 50,
+          near: 1,
+          far: 10000,
+        }}
+        onPointerMissed={() => setSelected(null)}
+        className="w-full h-full"
+      >
+        {/* Lighting */}
+        <ambientLight intensity={0.8} />
+        <directionalLight
+          position={[containerSize.w, containerSize.h * 2, containerSize.d]}
+          intensity={1.2}
+          castShadow
+          shadow-mapSize-width={1024}
+          shadow-mapSize-height={1024}
         />
-      ))}
+        <directionalLight position={[-200, 300, -200]} intensity={0.4} />
+        <hemisphereLight args={['#334155', '#0f172a', 0.5]} />
 
-      {/* Imperative camera controller */}
-      <CameraController orbitRef={orbitRef} />
+        {/* Grid */}
+        <Grid
+          position={[centerX, 0, centerZ]}
+          args={[containerSize.w + 200, containerSize.d + 200]}
+          cellSize={containerSize.w / 10}
+          cellThickness={0.5}
+          cellColor="#334155"
+          sectionSize={containerSize.w / 2}
+          sectionThickness={1}
+          sectionColor="#475569"
+          fadeDistance={2000}
+          fadeStrength={1}
+          infiniteGrid={false}
+        />
 
-      {/* Orbit Controls */}
-      <OrbitControls
-        ref={orbitRef}
-        target={[centerX, containerSize.h / 2, centerZ]}
-        enablePan={true}
-        enableZoom={true}
-        enableRotate={!isDragging}
-        minDistance={100}
-        maxDistance={3000}
-      />
-    </Canvas>
+        {/* Cargo Container */}
+        <CargoContainer />
+
+        {/* Boxes */}
+        {boxes.map((box) => (
+          <CargoBox
+            key={box.id}
+            box={box}
+            onDragStart={handleBoxDragStart}
+            onDragEnd={handleBoxDragEnd}
+          />
+        ))}
+
+        {/* Catalog drop ghost */}
+        <CatalogDropPreview />
+
+        {/* Imperative camera controller */}
+        <CameraController orbitRef={orbitRef} />
+
+        {/* Expose camera to drag handlers outside Canvas */}
+        <CameraGrabber onReady={(cam) => { cameraRef.current = cam }} />
+
+        {/* Orbit Controls */}
+        <OrbitControls
+          ref={orbitRef}
+          target={[centerX, containerSize.h / 2, centerZ]}
+          enablePan={true}
+          enableZoom={true}
+          enableRotate={!isDragging}
+          minDistance={100}
+          maxDistance={3000}
+        />
+      </Canvas>
+    </div>
   )
 }
