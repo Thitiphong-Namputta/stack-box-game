@@ -63,6 +63,17 @@ export type ViewMode = '3d' | 'top' | 'side'
 export type RenderMode = 'solid' | 'wire' | 'xray'
 export type CameraOp = 'zoom-in' | 'zoom-out' | 'reset'
 
+export interface DragPreview {
+  catalogItemId: string
+  size: BoxSize
+  weight: number
+  name: string
+  color: string
+  category?: string
+  position: { x: number; y: number; z: number } | null
+  isValid: boolean
+}
+
 // ── Orientation helpers ────────────────────────────────────────────
 
 const ORIENTATIONS: Array<(w: number, h: number, d: number) => [number, number, number]> = [
@@ -128,6 +139,11 @@ export interface SceneStore {
   setActivePlan: (id: string | null, name: string | null) => void
   loadPlan: (plan: SavedPlan) => void
 
+  // Drag preview (catalog → scene)
+  dragPreview: DragPreview | null
+  setDragPreview: (preview: DragPreview | null) => void
+  updateDragPreviewPosition: (pos: { x: number; y: number; z: number } | null, isValid: boolean) => void
+
   // Flash invalid feedback
   flashId: string | null
   setFlashId: (id: string | null) => void
@@ -186,6 +202,13 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
 
   unfitIds: [],
   setUnfitIds: (ids) => set({ unfitIds: ids }),
+
+  dragPreview: null,
+  setDragPreview: (preview) => set({ dragPreview: preview }),
+  updateDragPreviewPosition: (position, isValid) =>
+    set((state) =>
+      state.dragPreview ? { dragPreview: { ...state.dragPreview, position, isValid } } : {}
+    ),
 
   history: [],
   future: [],

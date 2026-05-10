@@ -12,6 +12,16 @@ import { useSceneStore, getNextColor } from '@/store/use-scene-store'
 import { useBinPacking } from '@/lib/packing/use-bin-packing'
 import type { CargoBox, CatalogItem } from '@/store/use-scene-store'
 
+// Pre-create a 1×1 transparent canvas once for setDragImage (hides browser default ghost)
+let blankDragImage: HTMLCanvasElement | null = null
+function getBlankDragImage() {
+  if (!blankDragImage) {
+    blankDragImage = document.createElement('canvas')
+    blankDragImage.width = blankDragImage.height = 1
+  }
+  return blankDragImage
+}
+
 // ── ManifestItemCard ────────────────────────────────────────────────
 function ManifestItemCard({ box }: { box: CargoBox }) {
   const { selectedId, setSelected, removeBox, unfitIds } = useSceneStore()
@@ -77,7 +87,7 @@ function ManifestItemCard({ box }: { box: CargoBox }) {
 
 // ── ItemsTab ────────────────────────────────────────────────────────
 export function ItemsTab() {
-  const { addBox, boxes, catalog } = useSceneStore()
+  const { addBox, boxes, catalog, setDragPreview } = useSceneStore()
   const { getSuggestedPosition } = useBinPacking()
   const [showCatalog, setShowCatalog] = useState(false)
   const [search, setSearch] = useState('')
@@ -109,6 +119,24 @@ export function ItemsTab() {
 
     addBox(newBox)
   }
+
+  const handleDragStart = (e: React.DragEvent, item: CatalogItem) => {
+    e.dataTransfer.setDragImage(getBlankDragImage(), 0, 0)
+    e.dataTransfer.effectAllowed = 'copy'
+    setDragPreview({
+      catalogItemId: item.id,
+      size: item.size,
+      weight: item.weight,
+      name: item.name,
+      color: getNextColor(),
+      category: item.category,
+      position: null,
+      isValid: false,
+    })
+    setShowCatalog(false)
+  }
+
+  const handleDragEnd = () => setDragPreview(null)
 
   const categories = [...new Set(catalog.map((i) => i.category).filter(Boolean))]
 
@@ -175,7 +203,10 @@ export function ItemsTab() {
                   {items.map((item) => (
                     <div
                       key={item.id}
-                      className="flex items-center justify-between p-3 rounded-lg mb-1 group transition-colors an-catalog-item"
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, item)}
+                      onDragEnd={handleDragEnd}
+                      className="flex items-center justify-between p-3 rounded-lg mb-1 group transition-colors cursor-grab active:cursor-grabbing an-catalog-item"
                       onClick={() => handleAdd(item)}
                     >
                       <div className="flex-1 min-w-0">
