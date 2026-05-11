@@ -454,7 +454,7 @@ export function SceneCanvas() {
           target={[centerX, containerSize.h / 2, centerZ]}
           enablePan={true}
           enableZoom={true}
-          enableRotate={!isDragging}
+          enableRotate={!isDragging && !dragRect && !boxSelectStart}
           minDistance={100}
           maxDistance={3000}
         />
