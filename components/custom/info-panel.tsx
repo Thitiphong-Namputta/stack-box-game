@@ -4,10 +4,11 @@ import { Trash2, Move3D } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { useSceneStore } from '@/store/use-scene-store'
+import { useSceneStore, selectedIdSelector } from '@/store/use-scene-store'
 
 export function InfoPanel() {
-  const { boxes, selectedId, setSelected, removeBox } = useSceneStore()
+  const { boxes, setSelected, removeBox } = useSceneStore()
+  const selectedId = useSceneStore(selectedIdSelector)
   const selected = boxes.find((b) => b.id === selectedId)
 
   if (!selected) {

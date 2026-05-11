@@ -24,8 +24,8 @@ function getBlankDragImage() {
 
 // ── ManifestItemCard ────────────────────────────────────────────────
 function ManifestItemCard({ box }: { box: CargoBox }) {
-  const { selectedId, setSelected, removeBox, unfitIds } = useSceneStore()
-  const isSelected = selectedId === box.id
+  const { setSelected, removeBox, unfitIds } = useSceneStore()
+  const isSelected = useSceneStore((s) => s.selectedIds.has(box.id))
   const isUnfit = unfitIds.includes(box.id)
 
   return (
@@ -110,6 +110,14 @@ export function ItemsTab() {
       color,
       position: { x: template.size.w / 2, y: template.size.h / 2, z: template.size.d / 2 },
       category: template.category,
+      fragile: template.fragile,
+      thisSideUp: template.thisSideUp,
+      nonStackable: template.nonStackable,
+      cannotBeStackedOn: template.cannotBeStackedOn,
+      maxStackWeight: template.maxStackWeight,
+      hazmat: template.hazmat,
+      temperature: template.temperature,
+      priority: template.priority,
     }
 
     const suggested = getSuggestedPosition(newBox)
@@ -132,6 +140,14 @@ export function ItemsTab() {
       category: item.category,
       position: null,
       isValid: false,
+      fragile: item.fragile,
+      thisSideUp: item.thisSideUp,
+      nonStackable: item.nonStackable,
+      cannotBeStackedOn: item.cannotBeStackedOn,
+      maxStackWeight: item.maxStackWeight,
+      hazmat: item.hazmat,
+      temperature: item.temperature,
+      priority: item.priority,
     })
     setShowCatalog(false)
   }

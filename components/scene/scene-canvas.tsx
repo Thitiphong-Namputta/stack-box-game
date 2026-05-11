@@ -11,8 +11,17 @@ import { CargoContainer } from './cargo-container'
 import { CargoBox } from './cargo-box'
 import { CatalogDropPreview } from './catalog-drop-preview'
 import { CoGMarker } from './cog-marker'
+import { SelectionRectangle } from './selection-rectangle'
+import { pickBoxesInRect } from '@/lib/selection/frustum-select'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import type { CargoBox as CargoBoxType } from '@/store/use-scene-store'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
 
 // ── CameraController ───────────────────────────────────────────────────
 function CameraController({
@@ -80,7 +89,6 @@ export function SceneCanvas() {
     boxes,
     containerSize,
     gridStep,
-    selectedId,
     setSelected,
     moveBox,
     removeBox,
@@ -92,11 +100,24 @@ export function SceneCanvas() {
     setDragPreview,
     updateDragPreviewPosition,
     addBox,
+    selectAll,
+    clearSelection,
+    removeSelected,
+    rotateSelected,
+    moveSelected,
+    overrideRequest,
+    setOverrideRequest,
   } = useSceneStore()
+  const selectedCount = useSceneStore((s) => s.selectedIds.size)
+  const multiSelectMode = useSceneStore((s) => s.multiSelectMode)
   const orbitRef = useRef<OrbitControlsImpl>(null)
   const canvasWrapperRef = useRef<HTMLDivElement>(null)
   const cameraRef = useRef<THREE.Camera | null>(null)
   const [isDragging, setIsDragging] = useState(false)
+
+  type Point = { x: number; y: number }
+  const [dragRect, setDragRect] = useState<{ start: Point; current: Point } | null>(null)
+  const [boxSelectStart, setBoxSelectStart] = useState<Point | null>(null)
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -111,38 +132,47 @@ export function SceneCanvas() {
       if (isMod && !e.shiftKey && e.key === 'z') { e.preventDefault(); undo(); return }
       if (isMod && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) { e.preventDefault(); redo(); return }
 
+      // Ctrl+A — select all
+      if (isMod && e.key === 'a') { e.preventDefault(); selectAll(); return }
+
       // Escape — deselect or cancel drag preview
       if (e.key === 'Escape') {
         setDragPreview(null)
-        setSelected(null)
+        clearSelection()
         return
       }
 
-      // Everything below requires a selected box
-      const box = selectedId ? boxes.find((b) => b.id === selectedId) : null
-      if (!box) return
+      // Everything below requires at least one selected box
+      const currentSelectedIds = useSceneStore.getState().selectedIds
+      if (currentSelectedIds.size === 0) return
 
-      // Delete — remove selected box
+      // Delete — remove all selected
       if (e.key === 'Delete') {
         e.preventDefault()
-        removeBox(box.id)
+        removeSelected()
         return
       }
 
-      // R — rotate selected box
+      // R — rotate all selected
       if (e.key === 'r' || e.key === 'R') {
         e.preventDefault()
         const dir = e.shiftKey ? 'bwd' : 'fwd'
-        const current = box.orientationId ?? 0
-        const next = (dir === 'fwd' ? current + 1 : current + 5) % 6
-        const rotated = { ...box, orientationId: next as 0 | 1 | 2 | 3 | 4 | 5 }
-        const pos = new THREE.Vector3(box.position.x, box.position.y, box.position.z)
-        const result = validatePlacement(rotated, pos, boxes, containerSize)
-        if (result.valid) {
-          rotateBox(box.id, dir)
+        if (currentSelectedIds.size === 1) {
+          const box = boxes.find((b) => b.id === Array.from(currentSelectedIds)[0])
+          if (!box) return
+          const current = box.orientationId ?? 0
+          const next = (dir === 'fwd' ? current + 1 : current + 5) % 6
+          const rotated = { ...box, orientationId: next as 0 | 1 | 2 | 3 | 4 | 5 }
+          const pos = new THREE.Vector3(box.position.x, box.position.y, box.position.z)
+          const result = validatePlacement(rotated, pos, boxes, containerSize)
+          if (result.valid) {
+            rotateBox(box.id, dir)
+          } else {
+            setFlashId(box.id)
+            setTimeout(() => setFlashId(null), 500)
+          }
         } else {
-          setFlashId(box.id)
-          setTimeout(() => setFlashId(null), 500)
+          rotateSelected(dir)
         }
         return
       }
@@ -159,21 +189,29 @@ export function SceneCanvas() {
       const move = MOVE_MAP[e.key]
       if (move) {
         e.preventDefault()
-        const newPos = new THREE.Vector3(box.position.x, box.position.y, box.position.z)
-        newPos[move.axis] += move.dir * gridStep
-        const result = validatePlacement(box, newPos, boxes, containerSize)
-        if (result.valid) {
-          moveBox(box.id, newPos)
+        if (currentSelectedIds.size === 1) {
+          const box = boxes.find((b) => b.id === Array.from(currentSelectedIds)[0])
+          if (!box) return
+          const newPos = new THREE.Vector3(box.position.x, box.position.y, box.position.z)
+          newPos[move.axis] += move.dir * gridStep
+          const result = validatePlacement(box, newPos, boxes, containerSize)
+          if (result.valid) {
+            moveBox(box.id, newPos)
+          } else {
+            setFlashId(box.id)
+            setTimeout(() => setFlashId(null), 500)
+          }
         } else {
-          setFlashId(box.id)
-          setTimeout(() => setFlashId(null), 500)
+          const delta = { x: 0, y: 0, z: 0 }
+          delta[move.axis] = move.dir * gridStep
+          moveSelected(delta)
         }
       }
     }
 
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [boxes, containerSize, gridStep, selectedId, setSelected, moveBox, removeBox, rotateBox, undo, redo, setFlashId, setDragPreview])
+  }, [boxes, containerSize, gridStep, setSelected, moveBox, removeBox, rotateBox, undo, redo, setFlashId, setDragPreview, selectAll, clearSelection, removeSelected, rotateSelected, moveSelected])
 
   // Cancel drag preview when window loses focus
   useEffect(() => {
@@ -181,6 +219,74 @@ export function SceneCanvas() {
     window.addEventListener('blur', onBlur)
     return () => window.removeEventListener('blur', onBlur)
   }, [setDragPreview])
+
+  // Box-select drag: track pointermove/up while dragRect is active
+  useEffect(() => {
+    if (!dragRect) return
+    const onMove = (e: PointerEvent) => {
+      const wrapper = canvasWrapperRef.current
+      if (!wrapper) return
+      const rect = wrapper.getBoundingClientRect()
+      setDragRect((prev) =>
+        prev
+          ? { ...prev, current: { x: e.clientX - rect.left, y: e.clientY - rect.top } }
+          : null
+      )
+    }
+    const onUp = () => {
+      const wrapper = canvasWrapperRef.current
+      const cam = cameraRef.current
+      if (wrapper && cam && dragRect) {
+        const { width, height } = wrapper.getBoundingClientRect()
+        const ids = pickBoxesInRect(
+          useSceneStore.getState().boxes,
+          cam,
+          { width, height },
+          { x1: dragRect.start.x, y1: dragRect.start.y, x2: dragRect.current.x, y2: dragRect.current.y }
+        )
+        if (ids.length > 0) {
+          useSceneStore.getState().addToSelection(ids)
+        }
+      }
+      setDragRect(null)
+    }
+    document.addEventListener('pointermove', onMove)
+    document.addEventListener('pointerup', onUp)
+    return () => {
+      document.removeEventListener('pointermove', onMove)
+      document.removeEventListener('pointerup', onUp)
+    }
+  }, [dragRect])
+
+  // Threshold-based box-select: only activate dragRect after pointer moves > 5px
+  useEffect(() => {
+    if (!boxSelectStart) return
+    const THRESHOLD = 5
+
+    const onMove = (e: PointerEvent) => {
+      const wrapper = canvasWrapperRef.current
+      if (!wrapper) return
+      const rect = wrapper.getBoundingClientRect()
+      const current = { x: e.clientX - rect.left, y: e.clientY - rect.top }
+      const dist = Math.hypot(current.x - boxSelectStart.x, current.y - boxSelectStart.y)
+      if (dist >= THRESHOLD) {
+        setDragRect({ start: boxSelectStart, current })
+        setBoxSelectStart(null)
+      }
+    }
+
+    const onUp = () => {
+      clearSelection()
+      setBoxSelectStart(null)
+    }
+
+    document.addEventListener('pointermove', onMove)
+    document.addEventListener('pointerup', onUp)
+    return () => {
+      document.removeEventListener('pointermove', onMove)
+      document.removeEventListener('pointerup', onUp)
+    }
+  }, [boxSelectStart, clearSelection])
 
   const handleBoxDragStart = useCallback(() => {
     setIsDragging(true)
@@ -248,6 +354,14 @@ export function SceneCanvas() {
       category: dragPreview.category,
       orientationId: 0,
       position: dragPreview.position,
+      fragile: dragPreview.fragile,
+      thisSideUp: dragPreview.thisSideUp,
+      nonStackable: dragPreview.nonStackable,
+      cannotBeStackedOn: dragPreview.cannotBeStackedOn,
+      maxStackWeight: dragPreview.maxStackWeight,
+      hazmat: dragPreview.hazmat,
+      temperature: dragPreview.temperature,
+      priority: dragPreview.priority,
     })
     setDragPreview(null)
   }, [dragPreview, addBox, setDragPreview])
@@ -265,7 +379,7 @@ export function SceneCanvas() {
       onDragOver={handleDragOver}
       onDrop={handleDrop}
       onDragLeave={handleDragLeave}
-      className="w-full h-full"
+      className="w-full h-full relative"
     >
       <Canvas
         shadows={{ type: THREE.PCFShadowMap }}
@@ -275,7 +389,13 @@ export function SceneCanvas() {
           near: 1,
           far: 10000,
         }}
-        onPointerMissed={() => setSelected(null)}
+        onPointerMissed={(e) => {
+          if (!multiSelectMode) { clearSelection(); return }
+          const wrapper = canvasWrapperRef.current
+          if (!wrapper) { clearSelection(); return }
+          const rect = wrapper.getBoundingClientRect()
+          setBoxSelectStart({ x: e.clientX - rect.left, y: e.clientY - rect.top })
+        }}
         className="w-full h-full"
       >
         {/* Lighting */}
@@ -334,11 +454,63 @@ export function SceneCanvas() {
           target={[centerX, containerSize.h / 2, centerZ]}
           enablePan={true}
           enableZoom={true}
-          enableRotate={!isDragging}
+          enableRotate={!isDragging && !dragRect && !boxSelectStart}
           minDistance={100}
           maxDistance={3000}
         />
       </Canvas>
+
+      {/* Box-select rectangle overlay */}
+      <SelectionRectangle start={dragRect?.start ?? null} current={dragRect?.current ?? null} />
+
+      {/* Multi-select HUD badge */}
+      {selectedCount > 1 && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full z-30 pointer-events-none"
+          style={{ background: 'rgba(15,23,42,0.85)', border: '1px solid rgba(99,102,241,0.4)' }}
+        >
+          <span className="text-xs font-bold text-indigo-300">
+            {selectedCount} boxes selected
+          </span>
+        </div>
+      )}
+
+      {/* Constraint Override Dialog */}
+      <Dialog open={!!overrideRequest} onOpenChange={(open) => { if (!open) setOverrideRequest(null) }}>
+        <DialogContent className="an-dialog-content sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="an-text-error">⚠️ ละเมิดกฎการวางซ้อน</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm an-text-on-surface mt-2">{overrideRequest?.reason}</p>
+          <p className="text-xs an-text-on-surface-muted mt-2">
+            คุณต้องการดำเนินการต่อหรือไม่? การละเมิดจะแสดงในรายงาน Constraint Analysis
+          </p>
+          <DialogFooter className="mt-4 gap-2 flex-row justify-end">
+            <button
+              type="button"
+              onClick={() => setOverrideRequest(null)}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium an-btn-outline-primary"
+            >
+              ยกเลิก
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (overrideRequest) {
+                  moveBox(overrideRequest.boxId, new THREE.Vector3(
+                    overrideRequest.newPos.x,
+                    overrideRequest.newPos.y,
+                    overrideRequest.newPos.z
+                  ))
+                }
+                setOverrideRequest(null)
+              }}
+              className="px-3 py-1.5 rounded-lg text-sm font-bold text-white bg-red-600 hover:bg-red-700 transition-colors"
+            >
+              ดำเนินการต่อ
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

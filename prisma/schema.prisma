@@ -32,32 +32,48 @@ model Plan {
 }
 
 model Box {
-  id            String  @id @default(cuid())
-  name          String
-  weight        Float
-  color         String
-  category      String?
-  orientationId Int     @default(0)
-  sizeW         Float
-  sizeH         Float
-  sizeD         Float
-  posX          Float
-  posY          Float
-  posZ          Float
-  planId        String
-  plan          Plan    @relation(fields: [planId], references: [id], onDelete: Cascade)
+  id                String  @id @default(cuid())
+  name              String
+  weight            Float
+  color             String
+  category          String?
+  orientationId     Int     @default(0)
+  sizeW             Float
+  sizeH             Float
+  sizeD             Float
+  posX              Float
+  posY              Float
+  posZ              Float
+  fragile           Boolean @default(false)
+  thisSideUp        Boolean @default(false)
+  nonStackable      Boolean @default(false)
+  cannotBeStackedOn Boolean @default(false)
+  maxStackWeight    Float?
+  hazmat            String?
+  temperature       String?
+  priority          Int     @default(3)
+  planId            String
+  plan              Plan    @relation(fields: [planId], references: [id], onDelete: Cascade)
 }
 
 model CatalogItem {
-  id       String  @id @default(cuid())
-  name     String
-  sizeW    Float
-  sizeH    Float
-  sizeD    Float
-  weight   Float
-  category String?
-  userId   String
-  user     User    @relation(fields: [userId], references: [id])
+  id                String  @id @default(cuid())
+  name              String
+  sizeW             Float
+  sizeH             Float
+  sizeD             Float
+  weight            Float
+  category          String?
+  fragile           Boolean @default(false)
+  thisSideUp        Boolean @default(false)
+  nonStackable      Boolean @default(false)
+  cannotBeStackedOn Boolean @default(false)
+  maxStackWeight    Float?
+  hazmat            String?
+  temperature       String?
+  priority          Int     @default(3)
+  userId            String
+  user              User    @relation(fields: [userId], references: [id])
 
   @@index([userId])
 }

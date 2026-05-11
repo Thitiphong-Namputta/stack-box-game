@@ -35,6 +35,14 @@ const catalogItemSchema = z.object({
   d: z.number().min(1, "ต้องมากกว่า 0").max(2000),
   weight: z.number().min(0).max(10000),
   category: z.string().optional(),
+  fragile: z.boolean().optional(),
+  thisSideUp: z.boolean().optional(),
+  nonStackable: z.boolean().optional(),
+  cannotBeStackedOn: z.boolean().optional(),
+  maxStackWeight: z.number().min(0).optional(),
+  hazmat: z.string().optional(),
+  temperature: z.enum(["ambient", "chilled", "frozen"]).optional(),
+  priority: z.number().min(1).max(5).optional(),
 });
 type CatalogItemForm = z.infer<typeof catalogItemSchema>;
 
@@ -69,12 +77,17 @@ function CatalogItemDialog({
     },
   });
 
+  const defaultValues: CatalogItemForm = {
+    name: "", w: 60, h: 60, d: 60, weight: 10, category: "",
+    fragile: false, thisSideUp: false, nonStackable: false, cannotBeStackedOn: false,
+    maxStackWeight: undefined, hazmat: "", temperature: undefined, priority: undefined,
+  };
+
   useEffect(() => {
     if (open) {
-      reset(
-        initialValues ?? { name: "", w: 60, h: 60, d: 60, weight: 10, category: "" }
-      );
+      reset(initialValues ?? defaultValues);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialValues, reset]);
 
   const onSubmit = (data: CatalogItemForm) => {
@@ -139,6 +152,75 @@ function CatalogItemDialog({
             </div>
           </div>
 
+          <details className="border border-an-outline-variant rounded-lg p-3">
+            <summary className="text-xs font-bold an-text-on-surface cursor-pointer select-none">
+              Stacking Constraints (advanced)
+            </summary>
+            <div className="mt-3 space-y-3">
+              <div className="grid grid-cols-2 gap-2 text-xs an-text-on-surface">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" {...register("fragile")} className="accent-current" />
+                  🍷 Fragile
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" {...register("thisSideUp")} className="accent-current" />
+                  ⬆️ This Side Up
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" {...register("nonStackable")} className="accent-current" />
+                  🚫 Non-stackable
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" {...register("cannotBeStackedOn")} className="accent-current" />
+                  🏠 Floor only
+                </label>
+              </div>
+              <div>
+                <label className="text-xs an-text-on-surface-muted mb-1 block">
+                  Max Stack Weight (kg)
+                </label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  {...register("maxStackWeight", { valueAsNumber: true })}
+                  className="an-input"
+                  placeholder="ไม่จำกัด"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs an-text-on-surface-muted mb-1 block">UN Hazmat Code</label>
+                  <Input {...register("hazmat")} className="an-input" placeholder="เช่น UN1170" />
+                </div>
+                <div>
+                  <label className="text-xs an-text-on-surface-muted mb-1 block">Temperature</label>
+                  <select
+                    {...register("temperature")}
+                    className="an-input w-full rounded-md px-2 py-1.5 text-sm"
+                  >
+                    <option value="">Any</option>
+                    <option value="ambient">Ambient</option>
+                    <option value="chilled">Chilled ❄️</option>
+                    <option value="frozen">Frozen 🧊</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs an-text-on-surface-muted mb-1 block">
+                  Priority (1 = ส่งก่อน, 5 = ส่งหลัง)
+                </label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={5}
+                  {...register("priority", { valueAsNumber: true })}
+                  className="an-input"
+                  placeholder="3"
+                />
+              </div>
+            </div>
+          </details>
+
           <DialogFooter>
             <button
               type="submit"
@@ -175,30 +257,34 @@ export default function CatalogPage() {
   const [editItem, setEditItem] = useState<CatalogItem | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'table'>('list');
 
+  const buildPayload = (data: CatalogItemForm): Omit<CatalogItem, "id"> => ({
+    name: data.name,
+    size: { w: data.w, h: data.h, d: data.d },
+    weight: data.weight,
+    category: data.category || undefined,
+    fragile: data.fragile || undefined,
+    thisSideUp: data.thisSideUp || undefined,
+    nonStackable: data.nonStackable || undefined,
+    cannotBeStackedOn: data.cannotBeStackedOn || undefined,
+    maxStackWeight: data.maxStackWeight || undefined,
+    hazmat: data.hazmat || undefined,
+    temperature: data.temperature || undefined,
+    priority: data.priority as CatalogItem["priority"] | undefined,
+  });
+
   const handleAdd = async (data: CatalogItemForm) => {
-    const payload = {
-      name: data.name,
-      size: { w: data.w, h: data.h, d: data.d },
-      weight: data.weight,
-      category: data.category || undefined,
-    };
+    const payload = buildPayload(data);
     try {
       const created = await createCatalogItem(payload);
       addCatalogItemWithId(created);
     } catch {
-      // Fallback: add locally without DB
       addCatalogItemWithId({ ...payload, id: crypto.randomUUID() });
     }
   };
 
   const handleEdit = async (data: CatalogItemForm) => {
     if (!editItem) return;
-    const payload = {
-      name: data.name,
-      size: { w: data.w, h: data.h, d: data.d },
-      weight: data.weight,
-      category: data.category || undefined,
-    };
+    const payload = buildPayload(data);
     try {
       await apiUpdateCatalogItem(editItem.id, payload);
     } catch {
@@ -216,7 +302,7 @@ export default function CatalogPage() {
     deleteCatalogItem(id);
   };
 
-  const editInitialValues = editItem
+  const editInitialValues: CatalogItemForm | undefined = editItem
     ? {
         name: editItem.name,
         w: editItem.size.w,
@@ -224,6 +310,14 @@ export default function CatalogPage() {
         d: editItem.size.d,
         weight: editItem.weight,
         category: editItem.category ?? "",
+        fragile: editItem.fragile ?? false,
+        thisSideUp: editItem.thisSideUp ?? false,
+        nonStackable: editItem.nonStackable ?? false,
+        cannotBeStackedOn: editItem.cannotBeStackedOn ?? false,
+        maxStackWeight: editItem.maxStackWeight,
+        hazmat: editItem.hazmat ?? "",
+        temperature: editItem.temperature,
+        priority: editItem.priority,
       }
     : undefined;
 
@@ -341,6 +435,16 @@ export default function CatalogPage() {
                   <p>ลึก</p>
                 </div>
               </div>
+              {(item.fragile || item.thisSideUp || item.nonStackable || item.hazmat || (item.temperature && item.temperature !== 'ambient')) && (
+                <div className="flex gap-1 flex-wrap mb-3">
+                  {item.fragile && <span className="text-[10px] px-1.5 py-0.5 rounded an-bg-surface-low an-text-on-surface">🍷 Fragile</span>}
+                  {item.thisSideUp && <span className="text-[10px] px-1.5 py-0.5 rounded an-bg-surface-low an-text-on-surface">⬆️ This Side Up</span>}
+                  {item.nonStackable && <span className="text-[10px] px-1.5 py-0.5 rounded an-bg-surface-low an-text-on-surface">🚫 Non-stack</span>}
+                  {item.cannotBeStackedOn && <span className="text-[10px] px-1.5 py-0.5 rounded an-bg-surface-low an-text-on-surface">🏠 Floor only</span>}
+                  {item.hazmat && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">⚠️ {item.hazmat}</span>}
+                  {item.temperature && item.temperature !== 'ambient' && <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">❄️ {item.temperature}</span>}
+                </div>
+              )}
               <div className="flex items-center justify-between text-xs an-text-on-surface-muted">
                 <span>{item.weight} kg</span>
                 <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">

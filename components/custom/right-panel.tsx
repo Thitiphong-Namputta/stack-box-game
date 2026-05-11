@@ -3,12 +3,14 @@
 import { useMemo, useState } from 'react'
 import * as THREE from 'three'
 import { CheckCircle2, XCircle, Download, AlertTriangle, RotateCcw, RotateCw, FileText, Sheet, Loader2 } from 'lucide-react'
-import { useSceneStore, getEffectiveSize } from '@/store/use-scene-store'
+import { useSceneStore, getEffectiveSize, selectedIdSelector } from '@/store/use-scene-store'
 import { useBinPacking } from '@/lib/packing/use-bin-packing'
 import { validatePlacement } from '@/lib/packing/packing-utils'
 import { exportPDF, exportXLSX } from '@/lib/api-client'
 import type { CargoBox } from '@/store/use-scene-store'
+import { auditAllConstraints } from '@/lib/packing/constraints'
 import { StabilityPanel } from './stability-panel'
+import { MultiSelectPanel } from './multi-select-panel'
 
 // ── helpers ─────────────────────────────────────────────────────────
 
@@ -107,7 +109,9 @@ function UtilizationBar({
 // ── RightPanel ───────────────────────────────────────────────────────
 
 export function RightPanel() {
-  const { boxes, selectedId, containerSize, unfitIds, rotateBox, setFlashId, activePlanId, activePlanName } = useSceneStore()
+  const { boxes, containerSize, unfitIds, rotateBox, setFlashId, activePlanId, activePlanName } = useSceneStore()
+  const selectedId = useSceneStore(selectedIdSelector)
+  const selectedCount = useSceneStore((s) => s.selectedIds.size)
   const { spaceUtilization } = useBinPacking()
   const [pdfLoading, setPdfLoading] = useState(false)
   const [xlsxLoading, setXlsxLoading] = useState(false)
@@ -128,6 +132,13 @@ export function RightPanel() {
       { label: 'No collisions', pass: noCollision },
     ]
   }, [boxes, totalWeight, containerSize.maxWeight, spaceUtilization])
+
+  const stackingViolations = useMemo(
+    () => auditAllConstraints(boxes, containerSize),
+    [boxes, containerSize]
+  )
+  const stackingErrors = stackingViolations.filter((v) => v.severity === 'error')
+  const stackingWarnings = stackingViolations.filter((v) => v.severity === 'warning')
 
   const exportPayload = () => ({
     plan: { id: activePlanId, name: activePlanName },
@@ -187,9 +198,10 @@ export function RightPanel() {
   }
 
   return (
-    <aside className="w-[320px] shrink-0 flex flex-col z-40 an-right-panel">
+    <aside className="w-[320px] shrink-0 flex flex-col z-40 an-right-panel h-full">
+      <div className="flex-1 overflow-y-auto min-h-0">
       {/* Utilization Metrics */}
-      <section className="p-6 shrink-0 an-section-border-bottom">
+      <section className="p-6 an-section-border-bottom">
         <SectionLabel>Utilization Metrics</SectionLabel>
         <div className="space-y-6 mt-4">
           <UtilizationBar
@@ -255,10 +267,49 @@ export function RightPanel() {
             </div>
           ))}
         </div>
+
+        {stackingErrors.length > 0 && (
+          <div className="mt-4">
+            <div className="text-[10px] font-bold an-text-error uppercase tracking-widest mb-2">
+              🚨 Stacking Violations ({stackingErrors.length})
+            </div>
+            {stackingErrors.map((v, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => {
+                  v.boxIds.forEach((id) => {
+                    setFlashId(id)
+                    setTimeout(() => setFlashId(null), 1500)
+                  })
+                }}
+                className="w-full text-left text-[11px] p-2 mb-1 rounded an-constraint-item-fail hover:opacity-80 transition-opacity"
+              >
+                {v.message}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {stackingWarnings.length > 0 && (
+          <div className="mt-3">
+            <div className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--color-an-primary)' }}>
+              ⚠️ Warnings ({stackingWarnings.length})
+            </div>
+            {stackingWarnings.map((v, i) => (
+              <div key={i} className="text-[11px] p-2 mb-1 rounded an-constraint-item opacity-80">
+                {v.message}
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
-      {/* Selected Item Details */}
-      <section className="flex-1 p-6 overflow-y-auto">
+      {/* Selected Item Details — switches between single / multi / empty */}
+      {selectedCount > 1 ? (
+        <MultiSelectPanel />
+      ) : (
+      <section className="p-6">
         <SectionLabel>
           {selected ? `Selection: ${selected.name}` : 'Selection'}
         </SectionLabel>
@@ -371,6 +422,8 @@ export function RightPanel() {
           </div>
         </div>
       </section>
+      )}
+      </div>
     </aside>
   )
 }
