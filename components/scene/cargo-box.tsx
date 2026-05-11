@@ -1,8 +1,8 @@
 'use client'
 
-import { useRef, useState, useCallback } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 import * as THREE from 'three'
-import { useThree, ThreeEvent } from '@react-three/fiber'
+import { useThree, ThreeEvent, useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import { useSceneStore, getEffectiveSize } from '@/store/use-scene-store'
 import { validatePlacement, getSupportY } from '@/lib/packing/packing-utils'
@@ -36,6 +36,45 @@ export function CargoBox({ box, onDragStart, onDragEnd }: CargoBoxProps) {
   const isSelected = useSceneStore((s) => s.selectedIds.has(box.id))
   const multiSelectMode = useSceneStore((s) => s.multiSelectMode)
   const isFlashing = flashId === box.id
+
+  // Loading sequence
+  const loadingOrder = useSceneStore((s) => s.loadingOrder)
+  const currentStep = useSceneStore((s) => s.currentStep)
+  const playbackState = useSceneStore((s) => s.playbackState)
+
+  const stepIndex = loadingOrder.indexOf(box.id)
+  const isLoaded = stepIndex !== -1 && stepIndex < currentStep
+  const isCurrent = stepIndex === currentStep - 1
+
+  // Animation: slide box in from above when it becomes the current step
+  const meshRef = useRef<THREE.Mesh>(null)
+  const animatedY = useRef(box.position.y)
+  const prevIsCurrent = useRef(false)
+
+  // Reset animatedY to above when isCurrent first becomes true
+  useEffect(() => {
+    if (isCurrent && !prevIsCurrent.current && playbackState !== 'idle') {
+      animatedY.current = box.position.y + 200
+    }
+    prevIsCurrent.current = isCurrent
+  }, [isCurrent, playbackState, box.position.y])
+
+  useFrame((_, delta) => {
+    if (!meshRef.current) return
+    if (isCurrent && playbackState !== 'idle') {
+      animatedY.current = THREE.MathUtils.lerp(
+        animatedY.current,
+        box.position.y,
+        Math.min(delta * 5, 1),
+      )
+      meshRef.current.position.y = animatedY.current
+    } else {
+      animatedY.current = box.position.y
+    }
+  })
+
+  // Hide boxes that haven't been loaded yet during active playback
+  if (playbackState !== 'idle' && !isLoaded && !isCurrent) return null
 
   const isDraggingRef = useRef(false)
   const ghostPosRef = useRef<THREE.Vector3 | null>(null)
@@ -196,6 +235,7 @@ export function CargoBox({ box, onDragStart, onDragEnd }: CargoBoxProps) {
   return (
     <>
       <mesh
+        ref={meshRef}
         position={position}
         onPointerDown={handlePointerDown}
         onPointerOver={() => { setShowTooltip(true) }}
@@ -246,6 +286,14 @@ export function CargoBox({ box, onDragStart, onDragEnd }: CargoBoxProps) {
                 {effectiveSize.w}×{effectiveSize.h}×{effectiveSize.d} cm
               </div>
               <div className="text-slate-400">{box.weight} kg</div>
+            </div>
+          </Html>
+        )}
+
+        {isCurrent && playbackState !== 'idle' && (
+          <Html distanceFactor={300} position={[0, effectiveSize.h / 2 + 18, 0]} center>
+            <div className="bg-indigo-600 text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg pointer-events-none">
+              #{stepIndex + 1}
             </div>
           </Html>
         )}

@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Box, Package, Plus, Pencil, Trash2, LayoutList, Table2 } from "lucide-react";
+import { Box, Package, Plus, Pencil, Trash2, LayoutList, Table2, Upload } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
 import { getCatalogColumns } from "./columns";
 import { ModeToggle } from "@/components/mode-toggle";
@@ -26,6 +26,7 @@ import {
   updateCatalogItem as apiUpdateCatalogItem,
   deleteCatalogItem as apiDeleteCatalogItem,
 } from "@/lib/api-client";
+import { ImportDialog } from "@/components/custom/import-dialog";
 
 // ── Form schema ─────────────────────────────────────────────────────
 const catalogItemSchema = z.object({
@@ -254,6 +255,7 @@ export default function CatalogPage() {
   } = useSceneStore();
 
   const [addOpen, setAddOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [editItem, setEditItem] = useState<CatalogItem | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'table'>('list');
 
@@ -382,6 +384,14 @@ export default function CatalogPage() {
             </div>
             <button
               type="button"
+              onClick={() => setImportOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-opacity hover:opacity-90 an-btn-outline-primary"
+            >
+              <Upload className="w-4 h-4" />
+              Import CSV/Excel
+            </button>
+            <button
+              type="button"
               onClick={() => setAddOpen(true)}
               className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-opacity hover:opacity-90 an-btn-autopack"
             >
@@ -490,6 +500,13 @@ export default function CatalogPage() {
           </div>
         )}
       </main>
+
+      {/* Import dialog */}
+      <ImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        target="catalog"
+      />
 
       {/* Add dialog */}
       <CatalogItemDialog

@@ -33,6 +33,8 @@ import { Input } from "@/components/ui/input";
 import { ItemsTab } from "@/components/custom/item-catalog";
 import { ContainerTab } from "@/components/custom/control-panel";
 import { RightPanel } from "@/components/custom/right-panel";
+import { PlaybackBar } from "@/components/custom/playback-bar";
+import { SequenceList } from "@/components/custom/sequence-list";
 import {
   useSceneStore,
   getSavedPlans,
@@ -268,7 +270,7 @@ function PlannerBreadcrumb() {
 }
 
 // ── Left Sidebar ─────────────────────────────────────────────────────
-type TabId = "items" | "container" | "steps";
+type TabId = "items" | "container" | "steps" | "sequence";
 
 const STEP_ICONS: Record<StepAction, string> = {
   addBox: "+",
@@ -359,6 +361,7 @@ function LeftSidebar({
     { id: "items", label: "Items" },
     { id: "container", label: "Container" },
     { id: "steps", label: "Steps" },
+    { id: "sequence", label: "Sequence" },
   ];
 
   return (
@@ -382,6 +385,7 @@ function LeftSidebar({
         {activeTab === "items" && <ItemsTab />}
         {activeTab === "container" && <ContainerTab />}
         {activeTab === "steps" && <StepsTab />}
+        {activeTab === "sequence" && <SequenceList />}
       </div>
     </aside>
   );
@@ -523,6 +527,7 @@ export default function PlannerPage() {
         {/* Center Canvas */}
         <section className="flex-1 relative an-canvas-grid an-bg-surface overflow-hidden">
           <SceneCanvas />
+          <PlaybackBar />
           <FloatingToolbar
             viewMode={viewMode}
             onViewMode={setViewMode}

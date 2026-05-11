@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import * as THREE from 'three'
 import { nanoid } from 'nanoid'
+import { computeLoadingOrder } from '@/lib/loading-sequence/compute-order'
 
 export interface BoxSize {
   w: number
@@ -74,6 +75,7 @@ export interface SavedPlan {
 export type ViewMode = '3d' | 'top' | 'side'
 export type RenderMode = 'solid' | 'wire' | 'xray'
 export type CameraOp = 'zoom-in' | 'zoom-out' | 'reset'
+export type PlaybackState = 'idle' | 'playing' | 'paused'
 
 export interface DragPreview extends StackingConstraints {
   catalogItemId: string
@@ -172,6 +174,21 @@ export interface SceneStore {
   overrideRequest: { boxId: string; newPos: { x: number; y: number; z: number }; reason: string } | null
   setOverrideRequest: (req: { boxId: string; newPos: { x: number; y: number; z: number }; reason: string } | null) => void
 
+  // Loading sequence playback
+  loadingOrder: string[]
+  currentStep: number
+  playbackState: PlaybackState
+  playbackSpeed: 0.5 | 1 | 2 | 4
+  computeLoadingOrder: () => void
+  setLoadingOrder: (ids: string[]) => void
+  play: () => void
+  pause: () => void
+  reset: () => void
+  stepForward: () => void
+  stepBackward: () => void
+  setStep: (step: number) => void
+  setPlaybackSpeed: (s: 0.5 | 1 | 2 | 4) => void
+
   // Selection actions
   setSelected: (id: string | null) => void
   toggleSelected: (id: string) => void
@@ -264,11 +281,14 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
       if (state.history.length === 0) return {}
       const prev = state.history[state.history.length - 1]
       const prevIds = new Set(prev.map((b) => b.id))
+      const order = computeLoadingOrder(prev)
       return {
         history: state.history.slice(0, -1),
         future: [state.boxes, ...state.future].slice(0, 20),
         boxes: prev,
         selectedIds: new Set([...state.selectedIds].filter((id) => prevIds.has(id))),
+        loadingOrder: order.map((b) => b.id),
+        currentStep: order.length,
       }
     })
     get().logStep('undo', 'Undo')
@@ -279,11 +299,14 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
       if (state.future.length === 0) return {}
       const next = state.future[0]
       const nextIds = new Set(next.map((b) => b.id))
+      const order = computeLoadingOrder(next)
       return {
         future: state.future.slice(1),
         history: [...state.history, state.boxes].slice(-20),
         boxes: next,
         selectedIds: new Set([...state.selectedIds].filter((id) => nextIds.has(id))),
+        loadingOrder: order.map((b) => b.id),
+        currentStep: order.length,
       }
     })
     get().logStep('redo', 'Redo')
@@ -330,7 +353,8 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
   activePlanName: null,
   setActivePlan: (id, name) => set({ activePlanId: id, activePlanName: name }),
 
-  loadPlan: (plan) =>
+  loadPlan: (plan) => {
+    const order = computeLoadingOrder(plan.boxes)
     set(() => ({
       boxes: plan.boxes,
       containerSize: plan.containerSize,
@@ -338,7 +362,11 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
       history: [],
       future: [],
       unfitIds: [],
-    })),
+      loadingOrder: order.map((b) => b.id),
+      currentStep: order.length,
+      playbackState: 'idle',
+    }))
+  },
 
   // Flash invalid feedback
   showCoG: true,
@@ -349,6 +377,32 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
 
   overrideRequest: null,
   setOverrideRequest: (req) => set({ overrideRequest: req }),
+
+  // Loading sequence playback
+  loadingOrder: [],
+  currentStep: 0,
+  playbackState: 'idle',
+  playbackSpeed: 1,
+
+  computeLoadingOrder: () => {
+    const order = computeLoadingOrder(get().boxes)
+    set({ loadingOrder: order.map((b) => b.id), currentStep: order.length })
+  },
+
+  setLoadingOrder: (ids) => set({ loadingOrder: ids, currentStep: 0 }),
+
+  play: () => set({ playbackState: 'playing' }),
+  pause: () => set({ playbackState: 'paused' }),
+  reset: () => set({ currentStep: 0, playbackState: 'idle' }),
+
+  stepForward: () =>
+    set((s) => ({ currentStep: Math.min(s.currentStep + 1, s.loadingOrder.length) })),
+
+  stepBackward: () =>
+    set((s) => ({ currentStep: Math.max(s.currentStep - 1, 0) })),
+
+  setStep: (step) => set({ currentStep: step }),
+  setPlaybackSpeed: (s) => set({ playbackSpeed: s }),
 
   // Selection actions
   setSelected: (id) => set({ selectedIds: id ? new Set([id]) : new Set() }),
@@ -386,11 +440,17 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
   setContainerSize: (size) => set({ containerSize: size }),
 
   addBox: (box) => {
-    set((state) => ({
-      history: [...state.history.slice(-19), state.boxes],
-      future: [],
-      boxes: [...state.boxes, box],
-    }))
+    set((state) => {
+      const newBoxes = [...state.boxes, box]
+      const order = computeLoadingOrder(newBoxes)
+      return {
+        history: [...state.history.slice(-19), state.boxes],
+        future: [],
+        boxes: newBoxes,
+        loadingOrder: order.map((b) => b.id),
+        currentStep: order.length,
+      }
+    })
     get().logStep('addBox', `Added ${box.name}`)
   },
 
@@ -399,11 +459,15 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
     set((state) => {
       const next = new Set(state.selectedIds)
       next.delete(id)
+      const newBoxes = state.boxes.filter((b) => b.id !== id)
+      const order = computeLoadingOrder(newBoxes)
       return {
         history: [...state.history.slice(-19), state.boxes],
         future: [],
-        boxes: state.boxes.filter((b) => b.id !== id),
+        boxes: newBoxes,
         selectedIds: next,
+        loadingOrder: order.map((b) => b.id),
+        currentStep: Math.min(state.currentStep, order.length),
       }
     })
     get().logStep('removeBox', `Removed ${name}`)
@@ -411,13 +475,19 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
 
   moveBox: (id, position) => {
     const name = get().boxes.find((b) => b.id === id)?.name ?? id
-    set((state) => ({
-      history: [...state.history.slice(-19), state.boxes],
-      future: [],
-      boxes: state.boxes.map((b) =>
+    set((state) => {
+      const newBoxes = state.boxes.map((b) =>
         b.id === id ? { ...b, position: { x: position.x, y: position.y, z: position.z } } : b
-      ),
-    }))
+      )
+      const order = computeLoadingOrder(newBoxes)
+      return {
+        history: [...state.history.slice(-19), state.boxes],
+        future: [],
+        boxes: newBoxes,
+        loadingOrder: order.map((b) => b.id),
+        currentStep: order.length,
+      }
+    })
     get().logStep('moveBox', `Moved ${name}`)
   },
 
@@ -426,13 +496,19 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
     if (!box) return
     const current = box.orientationId ?? 0
     const next = (dir === 'fwd' ? current + 1 : current + 5) % 6
-    set((state) => ({
-      history: [...state.history.slice(-19), state.boxes],
-      future: [],
-      boxes: state.boxes.map((b) =>
+    set((state) => {
+      const newBoxes = state.boxes.map((b) =>
         b.id === id ? { ...b, orientationId: next as 0 | 1 | 2 | 3 | 4 | 5 } : b
-      ),
-    }))
+      )
+      const order = computeLoadingOrder(newBoxes)
+      return {
+        history: [...state.history.slice(-19), state.boxes],
+        future: [],
+        boxes: newBoxes,
+        loadingOrder: order.map((b) => b.id),
+        currentStep: order.length,
+      }
+    })
     get().logStep('rotateBox', `Rotated ${box.name}`)
   },
 
@@ -445,19 +521,28 @@ export const useSceneStore = create<SceneStore>((set, get) => ({
       future: [],
       boxes: [],
       selectedIds: new Set(),
+      loadingOrder: [],
+      currentStep: 0,
+      playbackState: 'idle',
     }))
     get().logStep('clearBoxes', 'Cleared all boxes')
   },
 
   moveAllBoxes: (positions) =>
-    set((state) => ({
-      history: [...state.history.slice(-19), state.boxes],
-      future: [],
-      boxes: state.boxes.map((b) => {
+    set((state) => {
+      const newBoxes = state.boxes.map((b) => {
         const found = positions.find((p) => p.id === b.id)
         return found ? { ...b, position: found.position } : b
-      }),
-    })),
+      })
+      const order = computeLoadingOrder(newBoxes)
+      return {
+        history: [...state.history.slice(-19), state.boxes],
+        future: [],
+        boxes: newBoxes,
+        loadingOrder: order.map((b) => b.id),
+        currentStep: order.length,
+      }
+    }),
 
   // ── Bulk actions ───────────────────────────────────────────────────
 

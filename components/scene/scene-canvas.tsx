@@ -107,6 +107,10 @@ export function SceneCanvas() {
     moveSelected,
     overrideRequest,
     setOverrideRequest,
+    playbackState,
+    playbackSpeed,
+    stepForward,
+    pause,
   } = useSceneStore()
   const selectedCount = useSceneStore((s) => s.selectedIds.size)
   const multiSelectMode = useSceneStore((s) => s.multiSelectMode)
@@ -118,6 +122,21 @@ export function SceneCanvas() {
   type Point = { x: number; y: number }
   const [dragRect, setDragRect] = useState<{ start: Point; current: Point } | null>(null)
   const [boxSelectStart, setBoxSelectStart] = useState<Point | null>(null)
+
+  // Auto-play ticker
+  useEffect(() => {
+    if (playbackState !== 'playing') return
+    const ms = 1000 / playbackSpeed
+    const id = setInterval(() => {
+      const s = useSceneStore.getState()
+      if (s.currentStep >= s.loadingOrder.length) {
+        pause()
+        return
+      }
+      stepForward()
+    }, ms)
+    return () => clearInterval(id)
+  }, [playbackState, playbackSpeed, stepForward, pause])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -134,6 +153,16 @@ export function SceneCanvas() {
 
       // Ctrl+A — select all
       if (isMod && e.key === 'a') { e.preventDefault(); selectAll(); return }
+
+      // Space — play/pause loading sequence
+      if (e.key === ' ' && !isMod) {
+        e.preventDefault()
+        const s = useSceneStore.getState()
+        if (s.loadingOrder.length === 0) return
+        if (s.playbackState === 'playing') s.pause()
+        else s.play()
+        return
+      }
 
       // Escape — deselect or cancel drag preview
       if (e.key === 'Escape') {
@@ -177,6 +206,17 @@ export function SceneCanvas() {
         return
       }
 
+      // Arrow Left/Right — step through loading sequence (if no box selected)
+      if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !isMod) {
+        const s = useSceneStore.getState()
+        if (s.loadingOrder.length > 0 && s.selectedIds.size === 0) {
+          e.preventDefault()
+          if (e.key === 'ArrowLeft') s.stepBackward()
+          else s.stepForward()
+          return
+        }
+      }
+
       // Arrow keys + PageUp/PageDown — move 1 gridStep
       const MOVE_MAP: Record<string, { axis: 'x' | 'y' | 'z'; dir: 1 | -1 }> = {
         ArrowLeft:  { axis: 'x', dir: -1 },
@@ -211,7 +251,7 @@ export function SceneCanvas() {
 
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [boxes, containerSize, gridStep, setSelected, moveBox, removeBox, rotateBox, undo, redo, setFlashId, setDragPreview, selectAll, clearSelection, removeSelected, rotateSelected, moveSelected])
+  }, [boxes, containerSize, gridStep, setSelected, moveBox, removeBox, rotateBox, undo, redo, setFlashId, setDragPreview, selectAll, clearSelection, removeSelected, rotateSelected, moveSelected, pause])
 
   // Cancel drag preview when window loses focus
   useEffect(() => {

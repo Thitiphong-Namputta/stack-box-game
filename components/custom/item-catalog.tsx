@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { nanoid } from 'nanoid'
-import { Package, Plus, Box, Trash2 } from 'lucide-react'
+import { Package, Plus, Box, Trash2, Upload } from 'lucide-react'
+import { ImportDialog } from './import-dialog'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
@@ -90,6 +91,7 @@ export function ItemsTab() {
   const { addBox, boxes, catalog, setDragPreview } = useSceneStore()
   const { getSuggestedPosition } = useBinPacking()
   const [showCatalog, setShowCatalog] = useState(false)
+  const [showImport, setShowImport] = useState(false)
   const [search, setSearch] = useState('')
 
   const filtered = catalog.filter(
@@ -176,8 +178,8 @@ export function ItemsTab() {
         )}
       </div>
 
-      {/* Footer: Add Item */}
-      <div className="pt-4 mt-4 shrink-0 an-section-border-top">
+      {/* Footer: Add Item + Import */}
+      <div className="pt-4 mt-4 shrink-0 an-section-border-top space-y-2">
         <button
           type="button"
           onClick={() => setShowCatalog(true)}
@@ -186,7 +188,22 @@ export function ItemsTab() {
           <Plus className="w-4 h-4" />
           Add Item
         </button>
+        <button
+          type="button"
+          onClick={() => setShowImport(true)}
+          className="w-full py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all hover:opacity-80 an-text-on-surface-muted hover:an-text-primary"
+        >
+          <Upload className="w-3.5 h-3.5" />
+          Import CSV / Excel
+        </button>
       </div>
+
+      {/* Import dialog */}
+      <ImportDialog
+        open={showImport}
+        onOpenChange={setShowImport}
+        target="plan"
+      />
 
       {/* Catalog Sheet */}
       <Sheet open={showCatalog} onOpenChange={setShowCatalog}>
